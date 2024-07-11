@@ -23,6 +23,7 @@ import {
     Alert,
     AlertActionCloseButton,
     Button,
+    Checkbox,
     Flex,
     Page,
     PageSection,
@@ -99,6 +100,9 @@ const Application = () => {
 
     const [activeTabKey, setActiveTabKey] = useState<string | number>(0);
     const [sensorData, setSensorData] = useState<SensorData>({});
+    const [fahrenheitChecked, setFahrenheitChecked] = useState<boolean>(
+        () => localStorage.getItem("fahrenheitChecked") === "true"
+    );
 
     // ---------------------------------------- //
     // Callbacks
@@ -326,7 +330,13 @@ const Application = () => {
                                                 })(),
                                         }}
                                     >
-                                        {typeof value === "number" ? value.toFixed(2) : "—"}
+                                        {typeof value === "number"
+                                            ? category.key === "temp" && fahrenheitChecked
+                                                ? `${((value * 9) / 5 + 32).toFixed(1)} °F`
+                                                : category.key === "temp"
+                                                    ? `${value.toFixed(1)} °C`
+                                                    : value.toFixed(2)
+                                            : "—"}
                                     </Td>
                                 );
                             })}
@@ -356,8 +366,20 @@ const Application = () => {
                 )
                 : null}
             <PageSection hasBodyWrapper={false}>
-                <Flex justifyContent={{ default: "justifyContentSpaceBetween" }}>
-                    <Title headingLevel="h1">{_("Sensors")}</Title>
+                <Flex justifyContent={{ default: "justifyContentSpaceBetween" }} alignItems={{ default: "alignItemsFlexStart" }}>
+                    <Stack>
+                        <Title headingLevel="h1">{_("Sensors")}</Title>
+                        <Checkbox
+                            label={_("Show temperature in Fahrenheit")}
+                            isChecked={fahrenheitChecked}
+                            onChange={(_event, checked) => {
+                                setFahrenheitChecked(checked);
+                                localStorage.setItem("fahrenheitChecked", String(checked));
+                            }}
+                            id="fahrenheit-checkbox"
+                            name="fahrenheit-checkbox"
+                        />
+                    </Stack>
                     <Button
                         variant="control"
                         isDisabled={installed}
