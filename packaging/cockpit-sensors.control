@@ -1,10 +1,10 @@
-Package: cockpit-sensors 
-Name: Cockpit Sensors 
-Description: Cockpit Sensors Module that displays all data reported by lm-sensors. 
-Author: ocristopfer <ocristopfer@gmail.com> 
-Maintainer: ocristopfer <ocristopfer@gmail.com> 
-Version: 1.4.2
-Depends: lm-sensors 
-Architecture: all 
-Homepage: https://github.com/ocristopfer/cockpit-sensors 
+Package: cockpit-sensors
+Name: Cockpit Sensors
+Description: Cockpit Sensors Module that displays all data reported by lm-sensors.
+Author: ocristopfer <ocristopfer@gmail.com> (https://github.com/ocristopfer)
+Maintainer: RampantDespair (https://github.com/RampantDespair)
+Version: 2.0.0
+Depends: lm-sensors
+Architecture: all
+Homepage: https://github.com/ocristopfer/cockpit-sensors
 Website: https://github.com/ocristopfer/cockpit-sensors

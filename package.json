@@ -4,7 +4,10 @@
   "type": "module",
   "main": "index.js",
   "repository": "git@github.com:ocristopfer/cockpit-sensors.git",
-  "author": "https://github.com/ocristopfer",
+  "author": "ocristopfer <ocristopfer@gmail.com> (https://github.com/ocristopfer)",
+  "contributors": [
+    "RampantDespair (https://github.com/RampantDespair)"
+  ],
   "license": "LGPL-2.1",
   "engines": {
     "node": ">= 16"
@@ -14,12 +17,19 @@
     "build": "./build.js",
     "eslint": "eslint src/",
     "eslint:fix": "eslint --fix src/",
-    "stylelint": "stylelint src/*.{css,scss}",
-    "stylelint:fix": "stylelint --fix src/*.{css,scss}"
+    "stylelint": "stylelint src/*{.css,scss}",
+    "stylelint:fix": "stylelint --fix src/*{.css,scss}"
   },
   "devDependencies": {
-    "chrome-remote-interface": "0.33.0",
-    "esbuild-wasm": "0.27.4",
+    "@types/react": "18.3.13",
+    "@types/react-dom": "18.3.1",
+    "@typescript-eslint/eslint-plugin": "8.35.1",
+    "argparse": "2.0.1",
+    "esbuild": "0.25.5",
+    "esbuild-plugin-copy": "2.1.1",
+    "esbuild-plugin-replace": "1.4.0",
+    "esbuild-sass-plugin": "3.3.1",
+    "esbuild-wasm": "0.25.5",
     "eslint": "8.57.1",
     "eslint-config-standard": "17.1.0",
     "eslint-config-standard-jsx": "11.0.0",
@@ -29,22 +39,24 @@
     "eslint-plugin-promise": "6.6.0",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "4.6.2",
-    "qunit": "2.25.0",
-    "stylelint": "17.6.0",
-    "stylelint-config-recommended-scss": "17.0.0",
-    "stylelint-config-standard": "40.0.0",
-    "stylelint-config-standard-scss": "17.0.0",
-    "stylelint-formatter-pretty": "4.0.1"
+    "gettext-parser": "8.0.0",
+    "glob": "11.0.3",
+    "jed": "1.1.1",
+    "qunit": "2.24.1",
+    "sass": "1.79.6",
+    "stylelint": "16.21.1",
+    "stylelint-config-recommended-scss": "15.0.1",
+    "stylelint-config-standard": "38.0.0",
+    "stylelint-config-standard-scss": "15.0.1",
+    "stylelint-formatter-pretty": "4.0.1",
+    "typescript": "5.8.3"
   },
   "dependencies": {
     "@patternfly/patternfly": "6.1.0",
     "@patternfly/react-core": "6.1.0",
     "@patternfly/react-icons": "6.1.0",
-    "@patternfly/react-styles": "6.4.0",
-    "argparse": "2.0.1",
-    "esbuild": "0.27.4",
-    "esbuild-sass-plugin": "3.7.0",
-    "gettext-parser": "9.0.2",
+    "@patternfly/react-styles": "6.2.2",
+    "@patternfly/react-table": "^6.2.2",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   }
