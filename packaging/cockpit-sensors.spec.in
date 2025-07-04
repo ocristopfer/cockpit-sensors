@@ -1,11 +1,11 @@
-Name: cockpit-starter-kit
+Name: cockpit-sensors
 Version: %{VERSION}
 Release: 1%{?dist}
-Summary: Cockpit Starter Kit Example Module
+Summary: Cockpit Sensors Module
 License: LGPL-2.1-or-later
 
-Source0: https://github.com/cockpit-project/starter-kit/releases/download/%{version}/%{name}-%{version}.tar.xz
-Source1: https://github.com/cockpit-project/starter-kit/releases/download/%{version}/%{name}-node-%{version}.tar.xz
+Source0: https://github.com/ocristopfer/cockpit-sensors/releases/download/%{version}/%{name}-%{version}.tar.xz
+Source1: https://github.com/ocristopfer/cockpit-sensors/releases/download/%{version}/%{name}-node-%{version}.tar.xz
 BuildArch: noarch
 %if ! 0%{?suse_version}
 ExclusiveArch: %{nodejs_arches} noarch
@@ -30,7 +30,7 @@ Requires: cockpit-bridge
 %{NPM_PROVIDES}
 
 %description
-Cockpit Starter Kit Example Module
+Provides real-time monitoring of hardware sensors including CPU temperature, fan speeds, and voltages. Useful for diagnosing thermal issues, checking system health, and tracking hardware performance over time.
 
 %prep
 %autosetup -n %{name} -a 1
