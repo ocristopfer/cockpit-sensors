@@ -308,7 +308,24 @@ const Application = () => {
                                 );
                                 const value = matchingEntry?.[1];
                                 return (
-                                    <Td key={strippedKey} dataLabel={strippedKey}>
+                                    <Td
+                                        key={strippedKey}
+                                        dataLabel={strippedKey}
+                                        style={{
+                                            color:
+                                                (() => {
+                                                    if (strippedKey === "input") {
+                                                        const maxEntry = Object.entries(values).find(
+                                                            ([key]) => formatSensorKey(key) === "max"
+                                                        );
+
+                                                        const max = maxEntry?.[1];
+
+                                                        return typeof value === "number" && typeof max === "number" && max !== 0 && value > max ? "red" : undefined;
+                                                    }
+                                                })(),
+                                        }}
+                                    >
                                         {typeof value === "number" ? value.toFixed(2) : "—"}
                                     </Td>
                                 );
@@ -324,7 +341,7 @@ const Application = () => {
     // Render
     // ---------------------------------------- //
     return (
-        <Page>
+        <Page id="sensors" className="no-masthead-sidebar">
             {alert != null
                 ? (
                     <Alert
@@ -338,7 +355,7 @@ const Application = () => {
                     </Alert>
                 )
                 : null}
-            <PageSection>
+            <PageSection hasBodyWrapper={false}>
                 <Flex justifyContent={{ default: "justifyContentSpaceBetween" }}>
                     <Title headingLevel="h1">{_("Sensors")}</Title>
                     <Button
@@ -351,7 +368,7 @@ const Application = () => {
                     </Button>
                 </Flex>
             </PageSection>
-            <PageSection>
+            <PageSection hasBodyWrapper={false}>
                 <Stack>
                     <StackItem>
                         <Tabs
@@ -364,7 +381,7 @@ const Application = () => {
                                 eventKey={index}
                                 title={<TabTitleText>{chipName}</TabTitleText>}
                                 >
-                                    <Title headingLevel="h3">
+                                    <Title headingLevel="h3" style={{ marginTop: 8 }}>
                                         Adapter: {chipData.Adapter ?? "unknown"}
                                     </Title>
                                     <Stack hasGutter>
