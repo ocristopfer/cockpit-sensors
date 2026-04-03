@@ -1,0 +1,83 @@
+Name: cockpit-sensors
+Version: 1
+Release: 1%{?dist}
+Summary: Cockpit Sensors Module
+License: LGPL-2.1-or-later
+
+# distributions which ship nodejs-esbuild can rebuild the bundle during package build
+%if 0%{?fedora} >= 42
+%define rebuild_bundle 1
+%endif
+
+Source0: https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.tar.xz
+Source1: https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors-node.tar.xz
+BuildArch: noarch
+ExclusiveArch: %{nodejs_arches} noarch
+BuildRequires: make
+BuildRequires: libappstream-glib
+BuildRequires: gettext
+%if 0%{?rhel} && 0%{?rhel} <= 8
+BuildRequires: libappstream-glib-devel
+%endif
+%if %{defined rebuild_bundle}
+BuildRequires: /usr/bin/node
+BuildRequires: nodejs-esbuild
+%endif
+
+Requires: cockpit-bridge
+
+Provides: bundled(npm(@patternfly/react-core)) = 6.1.0
+Provides: bundled(npm(@patternfly/react-icons)) = 6.1.0
+Provides: bundled(npm(@patternfly/react-styles)) = 6.4.0
+Provides: bundled(npm(@patternfly/react-tokens)) = 6.4.0
+Provides: bundled(npm(attr-accept)) = 2.2.5
+Provides: bundled(npm(file-selector)) = 2.1.2
+Provides: bundled(npm(focus-trap)) = 7.6.2
+Provides: bundled(npm(object-assign)) = 4.1.1
+Provides: bundled(npm(prop-types)) = 15.8.1
+Provides: bundled(npm(react)) = 18.3.1
+Provides: bundled(npm(react-dom)) = 18.3.1
+Provides: bundled(npm(react-dropzone)) = 14.4.1
+Provides: bundled(npm(react-is)) = 16.13.1
+Provides: bundled(npm(scheduler)) = 0.23.2
+Provides: bundled(npm(tabbable)) = 6.4.0
+Provides: bundled(npm(tslib)) = 2.8.1
+
+%description
+Cockpit Sensors Module
+
+%prep
+%autosetup -n %{name}
+%if %{defined rebuild_bundle}
+%setup -q -D -T -a 1 -n %{name}
+%endif
+
+%build
+%if %{defined rebuild_bundle}
+rm -rf dist
+# HACK: node module packaging is broken in Fedora <= 43; should be in
+# common location, not major version specific one
+NODE_ENV=production NODE_PATH=/usr/lib/node_modules:$(echo /usr/lib/node_modules_*) ./build.js
+%else
+# Use pre-built bundle on distributions without nodejs-esbuild
+%endif
+
+%install
+%make_install PREFIX=/usr
+
+# drop source maps, they are large and just for debugging
+find %{buildroot}%{_datadir}/cockpit/ -name '*.map' | xargs --no-run-if-empty rm --verbose
+
+%check
+appstream-util validate-relax --nonet %{buildroot}/%{_datadir}/metainfo/*
+
+# this can't be meaningfully tested during package build; tests happen through
+# FMF (see plans/all.fmf) during package gating
+
+%files
+%doc README.md
+%license LICENSE dist/index.js.LEGAL.txt
+%{_datadir}/cockpit/*
+%{_datadir}/metainfo/*
+
+%changelog
