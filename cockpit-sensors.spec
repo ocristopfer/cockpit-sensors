@@ -1,5 +1,5 @@
 Name: cockpit-sensors
-Version: %{VERSION}
+Version: 1
 Release: 1%{?dist}
 Summary: Cockpit Sensors Module
 License: LGPL-2.1-or-later
@@ -26,10 +26,25 @@ BuildRequires: nodejs-esbuild
 
 Requires: cockpit-bridge
 
-%{NPM_PROVIDES}
+Provides: bundled(npm(@patternfly/react-core)) = 6.1.0
+Provides: bundled(npm(@patternfly/react-icons)) = 6.1.0
+Provides: bundled(npm(@patternfly/react-styles)) = 6.4.0
+Provides: bundled(npm(@patternfly/react-tokens)) = 6.4.0
+Provides: bundled(npm(attr-accept)) = 2.2.5
+Provides: bundled(npm(file-selector)) = 2.1.2
+Provides: bundled(npm(focus-trap)) = 7.6.2
+Provides: bundled(npm(object-assign)) = 4.1.1
+Provides: bundled(npm(prop-types)) = 15.8.1
+Provides: bundled(npm(react)) = 18.3.1
+Provides: bundled(npm(react-dom)) = 18.3.1
+Provides: bundled(npm(react-dropzone)) = 14.4.1
+Provides: bundled(npm(react-is)) = 16.13.1
+Provides: bundled(npm(scheduler)) = 0.23.2
+Provides: bundled(npm(tabbable)) = 6.4.0
+Provides: bundled(npm(tslib)) = 2.8.1
 
 %description
-Provides real-time monitoring of hardware sensors including CPU temperature, fan speeds, and voltages. Useful for diagnosing thermal issues, checking system health, and tracking hardware performance over time.
+Cockpit Sensors Module
 
 %prep
 %autosetup -n %{name}
