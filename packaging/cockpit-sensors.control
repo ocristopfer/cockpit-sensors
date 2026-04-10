@@ -2,7 +2,7 @@ Package: cockpit-sensors
 Name: Cockpit Sensors
 Description: Cockpit Sensors Module that displays all data reported by lm-sensors.
 Author: ocristopfer <ocristopfer@gmail.com> (https://github.com/ocristopfer)
-Maintainer: RampantDespair (https://github.com/RampantDespair)
+Maintainer: ocristopfer <ocristopfer@gmail.com>
 Version: 2.0.0
 Depends: lm-sensors
 Architecture: all
