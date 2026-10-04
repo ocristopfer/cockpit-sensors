@@ -32,6 +32,15 @@ sudo apt install ./cockpit-sensors.deb
 
 ## Fedora / RHEL / CentOS Stream
 
+From the [COPR repository](https://copr.fedorainfracloud.org/coprs/ocristopfer/cockpit-sensors/) (x86_64 and aarch64), which also delivers updates:
+
+```shell
+sudo dnf copr enable ocristopfer/cockpit-sensors
+sudo dnf install cockpit-sensors
+```
+
+Or install the RPM from the release directly:
+
 ```shell
 sudo dnf install https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.noarch.rpm
 ```
@@ -64,8 +73,8 @@ generated release notes.
 Thanks to everyone who helped build this module:
 
 - [@ocristopfer](https://github.com/ocristopfer) — author and maintainer
-- [@RampantDespair](https://github.com/RampantDespair) — 2.0 user interface rework
-- [@barrotsteindev](https://github.com/barrotsteindev) — PatternFly 6 and TypeScript migration, translations, packaging and upstream syncs
+- [@RampantDespair](https://github.com/RampantDespair) — designed and wrote the new 2.0 user interface (#102)
+- [@barrotsteindev](https://github.com/barrotsteindev) — rebased and finished the 2.0 interface (#108), PatternFly 6 migration, translations and packaging fixes
 - [@subz390](https://github.com/subz390) — original installation script
 - Everyone who reported issues and tested releases
 

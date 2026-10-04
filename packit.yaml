@@ -43,7 +43,11 @@ jobs:
     preserve_project: True
     targets:
       - fedora-all
+      - fedora-all-aarch64
       - centos-stream-9-x86_64
+      - centos-stream-9-aarch64
+      - centos-stream-10-x86_64
+      - centos-stream-10-aarch64
 
   # Build releases in Fedora: https://packit.dev/docs/configuration/#propose_downstream
   # (needs cockpit-sensors to be an official Fedora package first)
