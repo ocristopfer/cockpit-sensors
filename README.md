@@ -27,6 +27,20 @@ They depend on `lm-sensors`; run `sudo sensors-detect` once if `sensors` shows n
 
 ## Debian / Ubuntu (and derivatives)
 
+From the [APT repository](https://ocristopfer.github.io/cockpit-sensors/), which also delivers updates through `apt upgrade`:
+
+```shell
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://ocristopfer.github.io/cockpit-sensors/key.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/cockpit-sensors.gpg
+echo "deb [signed-by=/etc/apt/keyrings/cockpit-sensors.gpg] https://ocristopfer.github.io/cockpit-sensors stable main" | sudo tee /etc/apt/sources.list.d/cockpit-sensors.list
+sudo apt update
+sudo apt install cockpit-sensors
+```
+
+The repository is signed with the key `4DB9B57CDC03DBE1CD5E7CCD69E7F89677144C1B`.
+
+Or install the package from the release directly:
+
 ```shell
 wget https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.deb
 sudo apt install ./cockpit-sensors.deb
@@ -98,8 +112,11 @@ Releases are built and published by the [release workflow](.github/workflows/rel
 - push a version tag: `git tag -a 2.0.0 -m 2.0.0 && git push origin 2.0.0`, or
 - run the **release** workflow from the Actions tab and type the version; it creates the tag.
 
-The workflow builds the tarball, the `.deb` and the `.rpm`, and creates the GitHub release with
-generated release notes.
+The workflow builds the tarball, the `.deb` and the `.rpm`, creates the GitHub release with
+generated release notes and adds the `.deb` to the APT repository on GitHub Pages
+([apt-repo workflow](.github/workflows/apt-repo.yml), signed with the `APT_GPG_PRIVATE_KEY` secret).
+Publishing the release also makes Packit build it in the
+[COPR repository](https://copr.fedorainfracloud.org/coprs/ocristopfer/cockpit-sensors/).
 
 # Contributors
 
