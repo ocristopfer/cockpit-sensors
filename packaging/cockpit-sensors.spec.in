@@ -9,8 +9,8 @@ License: LGPL-2.1-or-later
 %define rebuild_bundle 1
 %endif
 
-Source0: https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.tar.xz
-Source1: https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors-node.tar.xz
+Source0: https://github.com/ocristopfer/cockpit-sensors/releases/download/%{version}/%{name}-%{version}.tar.xz
+Source1: https://github.com/ocristopfer/cockpit-sensors/releases/download/%{version}/%{name}-node-%{version}.tar.xz
 BuildArch: noarch
 ExclusiveArch: %{nodejs_arches} noarch
 BuildRequires: make
@@ -25,6 +25,7 @@ BuildRequires: nodejs-esbuild
 %endif
 
 Requires: cockpit-bridge
+Requires: lm_sensors
 
 %{NPM_PROVIDES}
 

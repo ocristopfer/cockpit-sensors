@@ -17,6 +17,8 @@
 /*.whl
 /bots
 /cockpit-*.spec
+/cockpit-*.deb
+/cockpit-*.rpm
 /cockpit-*.tar.xz
 /cockpit-navigator.spec
 /dist/

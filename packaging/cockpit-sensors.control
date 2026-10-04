@@ -1,10 +1,11 @@
 Package: cockpit-sensors
-Name: Cockpit Sensors
-Description: Cockpit Sensors Module that displays all data reported by lm-sensors.
-Author: ocristopfer <ocristopfer@gmail.com> (https://github.com/ocristopfer)
-Maintainer: ocristopfer <ocristopfer@gmail.com>
-Version: 2.0.0
-Depends: lm-sensors
+Version: VERSION
+Section: admin
+Priority: optional
 Architecture: all
+Depends: cockpit-bridge, lm-sensors
+Maintainer: ocristopfer <ocristopfer@gmail.com>
 Homepage: https://github.com/ocristopfer/cockpit-sensors
-Website: https://github.com/ocristopfer/cockpit-sensors
+Description: Cockpit module that displays all data reported by lm-sensors
+ Provides real-time monitoring of hardware sensors including CPU temperature,
+ fan speeds and voltages in the Cockpit web console.

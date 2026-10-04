@@ -1,59 +1,142 @@
-# Create a GitHub upstream release. Replace "TARNAME" with your project tarball
-# name and enable this by dropping the ".disabled" suffix from the file name.
-# See README.md.
+# Build the release artifacts and publish a GitHub release.
+#
+# Start a release either by pushing a version tag (git tag -a 2.0.0 -m 2.0.0 && git push origin 2.0.0)
+# or from the Actions tab ("Run workflow"), which creates the tag for you.
+# Publishing the GitHub release also triggers the Packit COPR build (see packit.yaml).
 name: release
 on:
   push:
     tags:
       # this is a glob, not a regexp
-      - "*"
+      - "[0-9]*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 2.0.0 (the tag is created from main)"
+        required: true
+
+permissions:
+  contents: write
+
 jobs:
-  source:
+  tag:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/cockpit-project/tasks:latest
-      options: --user root
-    permissions:
-      # create GitHub release
-      contents: write
-    env:
-      GH_TOKEN: ${{ github.token }}
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - name: Clone repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Install gh
-        run: dnf install -y gh
+      - name: Create or detect release tag
+        id: tag
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="$INPUT_VERSION"
+            if ! echo "$TAG" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
+              echo "::error::Invalid version '$TAG', expected something like 2.0.0"
+              exit 1
+            fi
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          else
+            TAG="$GITHUB_REF_NAME"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  tarball-deb:
+    needs: tag
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.tag.outputs.tag }}
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gettext make dpkg-dev appstream-util
+
+      - name: Build tarball and Debian package
+        run: |
+          make dist VERSION="$TAG"
+          make deb VERSION="$TAG"
+          cp "cockpit-sensors-$TAG.tar.xz" cockpit-sensors.tar.xz
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarball-deb
+          path: |
+            cockpit-sensors.tar.xz
+            cockpit-sensors-*.tar.xz
+            cockpit-sensors.deb
+
+  rpm:
+    needs: tag
+    runs-on: ubuntu-latest
+    container:
+      image: registry.fedoraproject.org/fedora:latest
+    env:
+      TAG: ${{ needs.tag.outputs.tag }}
+    steps:
+      - name: Install build dependencies
+        run: dnf install -y git make gettext nodejs npm nodejs-esbuild rpm-build libappstream-glib jq
+
+      - name: Clone repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+          fetch-depth: 0
 
       # https://github.blog/2022-04-12-git-security-vulnerability-announced/
       - name: Pacify git's permission check
-        run: git config --global --add safe.directory /__w/cockpit-sensors/cockpit-sensors
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Workaround for https://github.com/actions/checkout/pull/697
+      - name: Build RPM
         run: |
-          TAG_VERSION="$(git describe --tags)"
-          git fetch --force origin ${TAG_VERSION}:refs/tags/${TAG_VERSION}
+          make rpm VERSION="$TAG"
+          mv cockpit-sensors-*.noarch.rpm cockpit-sensors.noarch.rpm
+          rm -f cockpit-sensors-[0-9]*.tar.xz
 
-      - name: Build release
-        run: make dist
-
-      - name: Build Deb release
-        run: make deb
-
-      - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: cockpit-sensors.tar.xz
-          asset_name: cockpit-sensors.tar.xz
-          tag: ${{ github.ref }}
+          name: rpm
+          path: |
+            cockpit-sensors.noarch.rpm
+            cockpit-sensors-node-*.tar.xz
 
-      - name: Upload Deb binaries to release
-        uses: svenstaro/upload-release-action@v2
+  release:
+    needs: [tag, tarball-deb, rpm]
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.tag.outputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: cockpit-sensors.deb
-          asset_name: cockpit-sensors.deb
-          tag: ${{ github.ref }}
+          merge-multiple: true
+
+      - name: Create GitHub release
+        run: |
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --generate-notes \
+            --verify-tag \
+            cockpit-sensors.tar.xz \
+            cockpit-sensors.deb \
+            cockpit-sensors.noarch.rpm \
+            "cockpit-sensors-$TAG.tar.xz" \
+            "cockpit-sensors-node-$TAG.tar.xz"

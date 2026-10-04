@@ -1,28 +1,48 @@
 # Cockpit Sensors
 
-module that displays all data reported by lm-sensors
+Cockpit module that displays all data reported by lm-sensors (temperatures, fans and voltages).
 
-# Usage
+# Installation
 
-- Download the lastest [Sensors release](https://github.com/ocristopfer/cockpit-sensors/releases)
-- Extract the content of dist folder to /usr/share/cockpit/sensors
-- Check if Sensors tools is show on menu
+Packages for every release are attached to the
+[latest release](https://github.com/ocristopfer/cockpit-sensors/releases/latest).
+They depend on `lm-sensors`; run `sudo sensors-detect` once if `sensors` shows no data.
 
-- Installation script provided by [@subz390](https://github.com/subz390):
+## Debian / Ubuntu (and derivatives)
 
 ```shell
-wget https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.tar.xz && \
-  tar -xf cockpit-sensors.tar.xz cockpit-sensors/dist && \
-  mv cockpit-sensors/dist /usr/share/cockpit/sensors && \
-  rm -r cockpit-sensors && \
-  rm cockpit-sensors.tar.xz
+wget https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.deb
+sudo apt install ./cockpit-sensors.deb
 ```
 
-- .deb package:
-  [cockpit-sensors.deb](https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.deb)
+## Fedora / RHEL / CentOS Stream
 
-- .rpm package:
-  [cockpit-sensors.noarch.rpm](https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.noarch.rpm)
+```shell
+sudo dnf install https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.noarch.rpm
+```
+
+## Any other distribution (manual install)
+
+```shell
+wget https://github.com/ocristopfer/cockpit-sensors/releases/latest/download/cockpit-sensors.tar.xz
+tar -xf cockpit-sensors.tar.xz cockpit-sensors/dist
+sudo rm -rf /usr/share/cockpit/sensors
+sudo mkdir -p /usr/share/cockpit/sensors
+sudo cp -r cockpit-sensors/dist/. /usr/share/cockpit/sensors/
+rm -r cockpit-sensors cockpit-sensors.tar.xz
+```
+
+Then reload Cockpit and open **Sensors** in the menu.
+
+# Releasing
+
+Releases are built and published by the [release workflow](.github/workflows/release.yml):
+
+- push a version tag: `git tag -a 2.0.0 -m 2.0.0 && git push origin 2.0.0`, or
+- run the **release** workflow from the Actions tab and type the version; it creates the tag.
+
+The workflow builds the tarball, the `.deb` and the `.rpm`, and creates the GitHub release with
+generated release notes.
 
 # Prints
 

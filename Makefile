@@ -202,18 +202,15 @@ $(NODE_MODULES_TEST): package.json
 	for _ in `seq 3`; do timeout 10m env -u NODE_ENV npm install --ignore-scripts && exit 0; done; exit 1
 	env -u NODE_ENV npm prune
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check vm print-vm
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check vm print-vm deb
 
 
-deb:
-	rm -fr "`pwd`/output"
-	mkdir -m 0755 -p "`pwd`/output"
-	mkdir -m 0755 -p "`pwd`/output/cockpit-$(PACKAGE_NAME)"
-	mkdir -m 0755 -p "`pwd`/output/cockpit-$(PACKAGE_NAME)/DEBIAN"
-	mkdir -m 0755 -p "`pwd`/output/cockpit-$(PACKAGE_NAME)/usr/share/cockpit/$(PACKAGE_NAME)"
-	cp -r dist/* "`pwd`/output/cockpit-$(PACKAGE_NAME)/usr/share/cockpit/$(PACKAGE_NAME)"
-	cp packaging/cockpit-$(PACKAGE_NAME).control "`pwd`/output/cockpit-$(PACKAGE_NAME)/DEBIAN/control"
-	chmod 755 "`pwd`/output/cockpit-$(PACKAGE_NAME)/DEBIAN/control"
-	dpkg-deb -Zxz --build output/cockpit-$(PACKAGE_NAME)
-	mv "`pwd`/output/cockpit-$(PACKAGE_NAME).deb" "`pwd`/"
-	rm -r "`pwd`/output"
+# build a Debian/Ubuntu package from the bundle in dist/ (run "make dist" first for a production bundle)
+deb: $(DIST_TEST)
+	rm -rf output
+	mkdir -m 0755 -p output/$(RPM_NAME)/DEBIAN output/$(RPM_NAME)/usr/share/cockpit/$(PACKAGE_NAME)
+	cp -r dist/. output/$(RPM_NAME)/usr/share/cockpit/$(PACKAGE_NAME)/
+	find output/$(RPM_NAME)/usr/share/cockpit -name "*.map" -delete
+	sed "s/^Version:.*/Version: $(VERSION)/" packaging/$(RPM_NAME).control > output/$(RPM_NAME)/DEBIAN/control
+	dpkg-deb --root-owner-group -Zxz --build output/$(RPM_NAME) $(RPM_NAME).deb
+	rm -rf output
