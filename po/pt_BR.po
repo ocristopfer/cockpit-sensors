@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sensors 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-03 00:00+0000\n"
+"POT-Creation-Date: 2026-10-04 11:38+0000\n"
 "PO-Revision-Date: 2026-04-03 00:00+0000\n"
 "Last-Translator: Cristopfer Luis <ocristopfer@gmail.com>\n"
 "Language-Team: Portuguese (Brazil)\n"
@@ -17,40 +17,196 @@ msgstr ""
 msgid "Cockpit Sensors"
 msgstr "Sensores para Cockpit"
 
-#: src/manifest.json:8
+#: src/history.ts:133
+msgid "PCP is not available for $0"
+msgstr "O PCP não está disponível para $0"
+
+#: src/app.tsx:61
+msgid "Enable sensor history"
+msgstr "Ativar histórico dos sensores"
+
+#: src/app.tsx:65
+msgid "Sensor history is recorded with Performance Co-Pilot (PCP), the same service that powers Cockpit's Metrics and history page."
+msgstr "O histórico dos sensores é gravado com o Performance Co-Pilot (PCP), o mesmo serviço usado pela página Métricas e histórico do Cockpit."
+
+#: src/app.tsx:68
+msgid "PCP packages are not available for this distribution. Install PCP and its lm-sensors agent manually."
+msgstr "Os pacotes do PCP não estão disponíveis para esta distribuição. Instale o PCP e o agente lm-sensors manualmente."
+
+#: src/app.tsx:71
+msgid "This will:"
+msgstr "Isso vai:"
+
+#: src/app.tsx:75
+msgid "install the packages $0, if missing"
+msgstr "instalar os pacotes $0, se estiverem faltando"
+
+#: src/app.tsx:76
+msgid "install PCP, if missing"
+msgstr "instalar o PCP, se estiver faltando"
+
+#: src/app.tsx:78
+msgid "enable the PCP lm-sensors agent (pmdalmsensors)"
+msgstr "ativar o agente lm-sensors do PCP (pmdalmsensors)"
+
+#: src/app.tsx:79
+msgid "record all sensor readings every minute with pmlogger"
+msgstr "gravar as leituras de todos os sensores a cada minuto com o pmlogger"
+
+#: src/app.tsx:82
+msgid "History is kept as long as pmlogger keeps its archives (14 days by default)."
+msgstr "O histórico é mantido enquanto o pmlogger guardar seus arquivos (14 dias por padrão)."
+
+#: src/app.tsx:87
+msgid "Enabling sensor history failed"
+msgstr "Falha ao ativar o histórico dos sensores"
+
+#: src/app.tsx:91
+msgid "Enable"
+msgstr "Ativar"
+
+#: src/app.tsx:94
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: src/app.tsx:139
+msgid "lm-sensors not found, do you want to install it?"
+msgstr "lm-sensors não encontrado, deseja instalá-lo?"
+
+#: src/app.tsx:164
+msgid "Unable to detect OS: $0"
+msgstr "Não foi possível detectar o sistema operacional: $0"
+
+#: src/app.tsx:189
+msgid "Unsupported OS: $0"
+msgstr "Sistema operacional não suportado: $0"
+
+#: src/app.tsx:259 src/manifest.json:0
 #: org.cockpit_project.sensors.metainfo.xml:5
-#: src/app.jsx:247
 msgid "Sensors"
 msgstr "Sensores"
 
-#: org.cockpit_project.sensors.metainfo.xml:8
-msgid "Sensors cockpit module"
-msgstr "Sensores do lm-sensors para o cockpit"
-
-#: src/app.jsx:89
-msgid "lm-sensors not found, you want install it ?"
-msgstr "Não foi encontrado o lm-sensors, deseja instala-lo?"
-
-#: src/app.jsx:99
-msgid "this version of lm-sensors don't suport output sensors data!"
-msgstr "Essa versão do lm-sensors não tem suporte para saida de dados!"
-
-#: src/app.jsx:250
+#: src/app.tsx:261
 msgid "Show temperature in Fahrenheit"
 msgstr "Exibir temperatura em Fahrenheit"
 
-#: src/app.jsx:257
-msgid "Expand all cards"
-msgstr "Expandir todos os cards"
+#: src/app.tsx:278
+msgid "Install lm-sensors"
+msgstr "Instalar lm-sensors"
 
-#: src/app.jsx:265
-msgid "Install"
-msgstr "Instalar"
+#: src/app.tsx:282 src/HistoryChart.tsx:251
+msgid "Enable history"
+msgstr "Ativar histórico"
 
-#: src/app.jsx:157
-msgid "No supported package manager found"
-msgstr "Nenhum gerenciador de pacotes compatível encontrado"
+#: src/app.tsx:299
+msgid "Adapter: $0"
+msgstr "Adaptador: $0"
 
-#: src/app.jsx:266
-msgid "Show hided cards"
-msgstr "Mostrar cards ocultos"
+#: src/app.tsx:299
+msgid "unknown"
+msgstr "desconhecido"
+
+#: src/HistoryChart.tsx:37
+msgid "1 hour"
+msgstr "1 hora"
+
+#: src/HistoryChart.tsx:38
+msgid "24 hours"
+msgstr "24 horas"
+
+#: src/HistoryChart.tsx:39
+msgid "7 days"
+msgstr "7 dias"
+
+#: src/HistoryChart.tsx:182
+msgid "Sensor history is recorded with Performance Co-Pilot (PCP), which is not installed."
+msgstr "O histórico dos sensores é gravado com o Performance Co-Pilot (PCP), que não está instalado."
+
+#: src/HistoryChart.tsx:184
+msgid "The PCP lm-sensors agent is not enabled."
+msgstr "O agente lm-sensors do PCP não está ativado."
+
+#: src/HistoryChart.tsx:186
+msgid "PCP is not recording the sensors."
+msgstr "O PCP não está gravando os sensores."
+
+#: src/HistoryChart.tsx:188
+msgid "The python3-pcp package is missing, so the recorded history cannot be read."
+msgstr "O pacote python3-pcp está faltando, então o histórico gravado não pode ser lido."
+
+#: src/HistoryChart.tsx:243
+msgid "Sensor history is not enabled"
+msgstr "O histórico dos sensores não está ativado"
+
+#: src/HistoryChart.tsx:247
+msgid "Enabling it installs PCP if needed and records all sensors every minute."
+msgstr "Ao ativar, o PCP é instalado se necessário e todos os sensores são gravados a cada minuto."
+
+#: src/HistoryChart.tsx:263
+msgid "max"
+msgstr "máx"
+
+#: src/HistoryChart.tsx:265
+msgid "crit"
+msgstr "crít"
+
+#: src/HistoryChart.tsx:273
+msgid "Could not load the sensor history"
+msgstr "Não foi possível carregar o histórico do sensor"
+
+#: src/HistoryChart.tsx:278
+msgid "No history yet"
+msgstr "Ainda sem histórico"
+
+#: src/HistoryChart.tsx:280
+msgid "Sensors are recorded every minute; the first values appear shortly."
+msgstr "Os sensores são gravados a cada minuto; os primeiros valores aparecem em breve."
+
+#: src/HistoryChart.tsx:296
+msgid "Minimum: $0"
+msgstr "Mínimo: $0"
+
+#: src/HistoryChart.tsx:297
+msgid "Average: $0"
+msgstr "Média: $0"
+
+#: src/HistoryChart.tsx:298
+msgid "Maximum: $0"
+msgstr "Máximo: $0"
+
+#: src/HistoryChart.tsx:306
+msgid "History range"
+msgstr "Período do histórico"
+
+#: src/SensorTable.tsx:58
+msgid "Show history"
+msgstr "Mostrar histórico"
+
+#: src/SensorTable.tsx:59 src/SensorTable.tsx:78
+msgid "Label"
+msgstr "Rótulo"
+
+#: src/sensors.ts:30
+msgid "Fans"
+msgstr "Ventoinhas"
+
+#: src/sensors.ts:35
+msgid "Voltages"
+msgstr "Tensões"
+
+#: src/sensors.ts:40
+msgid "Temperatures"
+msgstr "Temperaturas"
+
+#: src/sensors.ts:134
+msgid "$0 RPM"
+msgstr "$0 RPM"
+
+#: org.cockpit_project.sensors.metainfo.xml:6
+msgid "Cockpit Sensors Module"
+msgstr "Módulo de sensores para o Cockpit"
+
+#: org.cockpit_project.sensors.metainfo.xml:8
+
+msgid "Provides real-time monitoring of hardware sensors including CPU temperature, fan speeds, and voltages. Useful for diagnosing thermal issues, checking system health, and tracking hardware performance over time."
+msgstr "Monitora em tempo real os sensores de hardware, incluindo temperatura da CPU, velocidade das ventoinhas e tensões. Útil para diagnosticar problemas térmicos, verificar a saúde do sistema e acompanhar o desempenho do hardware ao longo do tempo."
