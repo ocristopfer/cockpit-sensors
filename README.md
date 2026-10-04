@@ -1,6 +1,21 @@
 # Cockpit Sensors
 
-Cockpit module that displays all data reported by lm-sensors (temperatures, fans and voltages).
+A [Cockpit](https://cockpit-project.org/) module that displays all hardware sensor data
+reported by [lm-sensors](https://github.com/lm-sensors/lm-sensors): temperatures, fan speeds and voltages.
+
+![Cockpit Sensors](docs/screenshot.png)
+
+# Features
+
+- One tab per sensor chip (CPU, motherboard Super I/O, NVMe, GPU, ACPI, ...), grouped into
+  fans, voltages and temperatures
+- Live readings, refreshed every second
+- Values above the sensor's `max` limit are highlighted
+- Celsius or Fahrenheit (applies to all temperature limits; the choice is remembered)
+- Works with older lm-sensors versions without JSON output (`sensors -u` fallback)
+- Offers to install and configure lm-sensors when it is missing
+  (Debian/Ubuntu, Fedora/RHEL/CentOS, openSUSE, Arch, Alpine)
+- Follows the Cockpit look, including dark mode
 
 # Installation
 
@@ -44,9 +59,15 @@ Releases are built and published by the [release workflow](.github/workflows/rel
 The workflow builds the tarball, the `.deb` and the `.rpm`, and creates the GitHub release with
 generated release notes.
 
-# Prints
+# Contributors
 
-![alt text](https://i.ibb.co/tQ22dF4/cockpit.png)
+Thanks to everyone who helped build this module:
+
+- [@ocristopfer](https://github.com/ocristopfer) — author and maintainer
+- [@RampantDespair](https://github.com/RampantDespair) — 2.0 user interface rework
+- [@barrotsteindev](https://github.com/barrotsteindev) — PatternFly 6 and TypeScript migration, translations, packaging and upstream syncs
+- [@subz390](https://github.com/subz390) — original installation script
+- Everyone who reported issues and tested releases
 
 # Module created using Starter Kit
 

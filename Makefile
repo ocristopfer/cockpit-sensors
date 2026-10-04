@@ -160,8 +160,8 @@ rpm: $(TARFILE) $(NODE_CACHE) $(SPEC)
 	  --define "_buildrootdir `pwd`/build" \
 	  $(SPEC)
 	find `pwd`/output -name '*.rpm' -printf '%f\n' -exec mv {} . \;
-	rm -r "`pwd`/rpmbuild"
-	rm -r "`pwd`/output" "`pwd`/build"
+	rm -rf "`pwd`/rpmbuild"
+	rm -rf "`pwd`/output" "`pwd`/build"
 
 # build a VM with locally built distro pkgs installed
 # disable networking, VM images have mock/pbuilder with the common build dependencies pre-installed
