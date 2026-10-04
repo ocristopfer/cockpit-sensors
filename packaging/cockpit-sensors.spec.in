@@ -29,7 +29,7 @@ Requires: cockpit-bridge
 %{NPM_PROVIDES}
 
 %description
-Cockpit Sensors Module
+Provides real-time monitoring of hardware sensors including CPU temperature, fan speeds, and voltages. Useful for diagnosing thermal issues, checking system health, and tracking hardware performance over time.
 
 %prep
 %autosetup -n %{name}
