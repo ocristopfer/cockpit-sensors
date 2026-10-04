@@ -1,0 +1,130 @@
+# Publish the Debian/Ubuntu package of a release to the APT repository served by
+# GitHub Pages from the gh-pages branch (https://<owner>.github.io/<repo>/).
+#
+# Runs at the end of the release workflow, and can be run manually from the
+# Actions tab to (re-)add an existing release. The repository is signed with the
+# key in the APT_GPG_PRIVATE_KEY secret; its public part is published as key.gpg.
+name: apt-repo
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    secrets:
+      APT_GPG_PRIVATE_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release to add to the APT repository, e.g. 2.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apt-repo
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      ARCHITECTURES: amd64 arm64 armhf i386
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-utils dpkg-dev gnupg
+
+      - name: Switch to the gh-pages branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
+            git checkout gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf --quiet .
+          fi
+
+      - name: Add the release's package to the pool
+        run: |
+          deb="pool/main/c/cockpit-sensors/cockpit-sensors_${TAG}_all.deb"
+          mkdir -p "$(dirname "$deb")"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern cockpit-sensors.deb --output "$deb" --clobber
+          version="$(dpkg-deb --field "$deb" Version)"
+          if [ "$version" != "$TAG" ]; then
+            echo "::error::package version $version does not match release $TAG"
+            exit 1
+          fi
+
+      - name: Import signing key
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: |
+          echo "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          KEYID="$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/ { print $5; exit }')"
+          echo "KEYID=$KEYID" >> "$GITHUB_ENV"
+          gpg --armor --export "$KEYID" > key.gpg
+
+      - name: Generate and sign the repository metadata
+        run: |
+          rm -rf dists
+          for arch in $ARCHITECTURES; do
+            dir="dists/stable/main/binary-$arch"
+            mkdir -p "$dir"
+            apt-ftparchive --arch "$arch" packages pool > "$dir/Packages"
+            gzip -9 --keep --force "$dir/Packages"
+          done
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin=cockpit-sensors \
+            -o APT::FTPArchive::Release::Label=cockpit-sensors \
+            -o APT::FTPArchive::Release::Suite=stable \
+            -o APT::FTPArchive::Release::Codename=stable \
+            -o APT::FTPArchive::Release::Components=main \
+            -o "APT::FTPArchive::Release::Architectures=$ARCHITECTURES" \
+            -o "APT::FTPArchive::Release::Description=Cockpit Sensors packages for Debian and Ubuntu" \
+            release dists/stable > Release
+          mv Release dists/stable/Release
+          gpg --batch --yes --default-key "$KEYID" --clearsign --output dists/stable/InRelease dists/stable/Release
+          gpg --batch --yes --default-key "$KEYID" --armor --detach-sign --output dists/stable/Release.gpg dists/stable/Release
+
+      - name: Write the landing page
+        run: |
+          url="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
+          touch .nojekyll
+          cat > index.html <<EOF
+          <!DOCTYPE html>
+          <html lang="en">
+          <head><meta charset="utf-8"><title>Cockpit Sensors APT repository</title></head>
+          <body>
+          <h1>Cockpit Sensors APT repository</h1>
+          <p>Packages of <a href="https://github.com/${GITHUB_REPOSITORY}">cockpit-sensors</a> for Debian and Ubuntu.</p>
+          <pre>
+          sudo install -d -m 0755 /etc/apt/keyrings
+          curl -fsSL ${url}/key.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/cockpit-sensors.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/cockpit-sensors.gpg] ${url} stable main" | sudo tee /etc/apt/sources.list.d/cockpit-sensors.list
+          sudo apt update
+          sudo apt install cockpit-sensors
+          </pre>
+          </body>
+          </html>
+          EOF
+
+      - name: Publish
+        run: |
+          git add --all
+          if git diff --cached --quiet; then
+            echo "Nothing changed"
+            exit 0
+          fi
+          git commit --quiet --message "Add cockpit-sensors $TAG"
+          git push origin gh-pages

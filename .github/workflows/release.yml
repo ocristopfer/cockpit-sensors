@@ -2,7 +2,8 @@
 #
 # Start a release either by pushing a version tag (git tag -a 2.0.0 -m 2.0.0 && git push origin 2.0.0)
 # or from the Actions tab ("Run workflow"), which creates the tag for you.
-# Publishing the GitHub release also triggers the Packit COPR build (see packit.yaml).
+# Publishing the GitHub release also triggers the Packit COPR build (see packit.yaml),
+# and the package is added to the APT repository on GitHub Pages (see apt-repo.yml).
 name: release
 on:
   push:
@@ -140,3 +141,10 @@ jobs:
             cockpit-sensors.noarch.rpm \
             "cockpit-sensors-$TAG.tar.xz" \
             "cockpit-sensors-node-$TAG.tar.xz"
+
+  apt-repo:
+    needs: [tag, release]
+    uses: ./.github/workflows/apt-repo.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    secrets: inherit
