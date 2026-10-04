@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 @use "page.scss";
 
-p {
-    font-weight: bold;
+.sensors-adapter {
+    color: var(--pf-t--global--text--color--subtle);
+    margin-block: var(--pf-t--global--spacer--md);
+}
+
+.sensors-card td.sensors-value-critical {
+    color: var(--pf-t--global--text--color--status--danger--default);
+    font-weight: var(--pf-t--global--font--weight--body--bold);
 }

@@ -8,6 +8,7 @@ import type { SVGIconProps } from "@patternfly/react-icons/dist/esm/createIcon";
 
 import { Alert, AlertActionCloseButton } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
+import { Card, CardBody, CardHeader, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { Page, PageSection } from "@patternfly/react-core/dist/esm/components/Page/index.js";
 import { Tab, Tabs, TabTitleText } from "@patternfly/react-core/dist/esm/components/Tabs/index.js";
@@ -17,7 +18,7 @@ import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/
 import { ChargingStationIcon } from "@patternfly/react-icons/dist/esm/icons/charging-station-icon.js";
 import { FanIcon } from "@patternfly/react-icons/dist/esm/icons/fan-icon.js";
 import { ThermometerHalfIcon } from "@patternfly/react-icons/dist/esm/icons/thermometer-half-icon.js";
-import { Caption, Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table/dist/esm/components/Table/index.js";
+import { Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table/dist/esm/components/Table/index.js";
 import cockpit from "cockpit";
 import React, { useCallback, useEffect, useState } from "react";
 
@@ -311,59 +312,56 @@ const Application = () => {
         const strippedKeys = Object.keys(displayKeyMap);
 
         return (
-            <Table>
-                <Caption>
-                    <Flex>
-                        <category.icon />
-                        {category.label}
-                    </Flex>
-                </Caption>
-                <Thead>
-                    <Tr>
-                        <Th>{_("Label")}</Th>
-                        {strippedKeys.map((strippedKey) => (
-                            <Th key={strippedKey}>{strippedKey}</Th>
-                        ))}
-                    </Tr>
-                </Thead>
-                <Tbody>
-                    {Object.entries(rows).map(([label, values]) => (
-                        <Tr key={label}>
-                            <Td dataLabel={_("Label")}>{label}</Td>
-                            {strippedKeys.map((strippedKey) => {
-                                const matchingEntry = Object.entries(values).find(
-                                    ([key]) => formatSensorKey(key) === strippedKey,
-                                );
-                                const value = matchingEntry?.[1];
+            <Card className="sensors-card">
+                <CardHeader>
+                    <CardTitle>
+                        <Flex spaceItems={{ default: "spaceItemsSm" }} alignItems={{ default: "alignItemsCenter" }}>
+                            <category.icon />
+                            <span>{category.label}</span>
+                        </Flex>
+                    </CardTitle>
+                </CardHeader>
+                <CardBody>
+                    <Table variant="compact" aria-label={category.label}>
+                        <Thead>
+                            <Tr>
+                                <Th>{_("Label")}</Th>
+                                {strippedKeys.map((strippedKey) => (
+                                    <Th key={strippedKey}>{strippedKey}</Th>
+                                ))}
+                            </Tr>
+                        </Thead>
+                        <Tbody>
+                            {Object.entries(rows).map(([label, values]) => {
+                                const max = Object.entries(values).find(([key]) => formatSensorKey(key) === "max")?.[1];
                                 return (
-                                    <Td
-                                        key={strippedKey}
-                                        dataLabel={strippedKey}
-                                        style={{
-                                            color:
-                                                (() => {
-                                                    if (strippedKey === "input") {
-                                                        const maxEntry = Object.entries(values).find(
-                                                            ([key]) => formatSensorKey(key) === "max"
-                                                        );
-
-                                                        const max = maxEntry?.[1];
-
-                                                        return typeof value === "number" && typeof max === "number" && max !== 0 && value > max ? "red" : undefined;
-                                                    }
-                                                })(),
-                                        }}
-                                    >
-                                        {typeof value === "number"
-                                            ? formatSensorValue(category.key, strippedKey, value)
-                                            : "—"}
-                                    </Td>
+                                    <Tr key={label}>
+                                        <Td dataLabel={_("Label")}>{label}</Td>
+                                        {strippedKeys.map((strippedKey) => {
+                                            const value = Object.entries(values).find(
+                                                ([key]) => formatSensorKey(key) === strippedKey,
+                                            )?.[1];
+                                            const critical = strippedKey === "input" && typeof value === "number" &&
+                                                typeof max === "number" && max !== 0 && value > max;
+                                            return (
+                                                <Td
+                                                    key={strippedKey}
+                                                    dataLabel={strippedKey}
+                                                    className={critical ? "sensors-value-critical" : ""}
+                                                >
+                                                    {typeof value === "number"
+                                                        ? formatSensorValue(category.key, strippedKey, value)
+                                                        : "—"}
+                                                </Td>
+                                            );
+                                        })}
+                                    </Tr>
                                 );
                             })}
-                        </Tr>
-                    ))}
-                </Tbody>
-            </Table>
+                        </Tbody>
+                    </Table>
+                </CardBody>
+            </Card>
         );
     };
 
@@ -371,23 +369,19 @@ const Application = () => {
     // Render
     // ---------------------------------------- //
     return (
-        <Page id="sensors" className="no-masthead-sidebar">
-            {alert != null
-                ? (
+        <Page id="sensors" className="pf-m-no-sidebar">
+            {alert != null &&
+                <PageSection hasBodyWrapper={false}>
                     <Alert
-                    variant={alert.variant}
-                    title={undefined}
-                    actionClose={
-                        <AlertActionCloseButton onClose={() => setAlert(null)} />
-                    }
-                    >
-                        {alert.msg}
-                    </Alert>
-                )
-                : null}
+                        isInline
+                        variant={alert.variant}
+                        title={alert.msg}
+                        actionClose={<AlertActionCloseButton onClose={() => setAlert(null)} />}
+                    />
+                </PageSection>}
             <PageSection hasBodyWrapper={false}>
-                <Flex justifyContent={{ default: "justifyContentSpaceBetween" }} alignItems={{ default: "alignItemsFlexStart" }}>
-                    <Stack>
+                <Flex justifyContent={{ default: "justifyContentSpaceBetween" }} alignItems={{ default: "alignItemsCenter" }}>
+                    <Stack hasGutter>
                         <Title headingLevel="h1">{_("Sensors")}</Title>
                         <Checkbox
                             label={_("Show temperature in Fahrenheit")}
@@ -412,35 +406,31 @@ const Application = () => {
                 </Flex>
             </PageSection>
             {Object.keys(sensorData).length > 0 &&
-            <PageSection hasBodyWrapper={false}>
-                <Stack>
-                    <StackItem>
-                        <Tabs
+                <PageSection hasBodyWrapper={false}>
+                    <Tabs
                         activeKey={activeTabKey}
                         onSelect={(_event, eventKey) => setActiveTabKey(eventKey)}
-                        >
-                            {Object.entries(sensorData).map(([chipName, chipData], index) => (
-                                <Tab
+                    >
+                        {Object.entries(sensorData).map(([chipName, chipData], index) => (
+                            <Tab
                                 key={chipName}
                                 eventKey={index}
                                 title={<TabTitleText>{chipName}</TabTitleText>}
-                                >
-                                    <Title headingLevel="h3" style={{ marginTop: 8 }}>
-                                        {cockpit.format(_("Adapter: $0"), chipData.Adapter ?? _("unknown"))}
-                                    </Title>
-                                    <Stack hasGutter>
-                                        {sensorCategories.map((category) => (
-                                            <StackItem key={category.key}>
-                                                <SensorTable category={category} chipData={chipData} />
-                                            </StackItem>
-                                        ))}
-                                    </Stack>
-                                </Tab>
-                            ))}
-                        </Tabs>
-                    </StackItem>
-                </Stack>
-            </PageSection>}
+                            >
+                                <p className="sensors-adapter">
+                                    {cockpit.format(_("Adapter: $0"), chipData.Adapter ?? _("unknown"))}
+                                </p>
+                                <Stack hasGutter>
+                                    {sensorCategories.map((category) => (
+                                        <StackItem key={category.key}>
+                                            <SensorTable category={category} chipData={chipData} />
+                                        </StackItem>
+                                    ))}
+                                </Stack>
+                            </Tab>
+                        ))}
+                    </Tabs>
+                </PageSection>}
         </Page>
     );
 };
