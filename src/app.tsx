@@ -4,112 +4,101 @@
  * Copyright (C) 2017 Red Hat, Inc.
  */
 
-import type { SVGIconProps } from "@patternfly/react-icons/dist/esm/createIcon";
-
 import { Alert, AlertActionCloseButton } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
-import { Card, CardBody, CardHeader, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
+import { Content } from "@patternfly/react-core/dist/esm/components/Content/index.js";
+import { Modal, ModalBody, ModalFooter, ModalHeader } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
 import { Page, PageSection } from "@patternfly/react-core/dist/esm/components/Page/index.js";
 import { Tab, Tabs, TabTitleText } from "@patternfly/react-core/dist/esm/components/Tabs/index.js";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
-import { ChargingStationIcon } from "@patternfly/react-icons/dist/esm/icons/charging-station-icon.js";
-import { FanIcon } from "@patternfly/react-icons/dist/esm/icons/fan-icon.js";
-import { ThermometerHalfIcon } from "@patternfly/react-icons/dist/esm/icons/thermometer-half-icon.js";
-import { Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table/dist/esm/components/Table/index.js";
 import cockpit from "cockpit";
 import React, { useCallback, useEffect, useState } from "react";
 
+import { enableHistory, getHistoryStatus, pcpPackages } from "./history";
+import type { HistoryStatus } from "./history";
+import { SensorTable } from "./SensorTable";
+import { extractSensorGroup, parseSensorsRaw, readOsIds, sensorCategories } from "./sensors";
+import type { SensorData } from "./sensors";
+
 const _ = cockpit.gettext;
 
-// Global Types
 type AlertInfo = {
     msg: string;
     variant: "danger" | "warning" | "info" | "success";
 } | null;
 
-type SensorValueGroup = Record<string, number>;
-type SensorChipGroup = {
-    Adapter?: string;
-    [key: string]: SensorValueGroup | string | undefined; // Label
-};
-type SensorData = Record<string, SensorChipGroup>;
-type SensorCategory = {
-    key: string;
-    label: string;
-    icon: React.ComponentClass<SVGIconProps>;
-};
+const EnableHistoryModal = ({ onClose, onEnabled }: { onClose: () => void; onEnabled: () => void }) => {
+    const [packages, setPackages] = useState<string[] | null | undefined>(undefined);
+    const [osIds, setOsIds] = useState<string[]>([]);
+    const [running, setRunning] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-// Global constants
-const sensorCategories: SensorCategory[] = [
-    {
-        key: "fan",
-        label: _("Fans"),
-        icon: FanIcon,
-    },
-    {
-        key: "in",
-        label: _("Voltages"),
-        icon: ChargingStationIcon,
-    },
-    {
-        key: "temp",
-        label: _("Temperatures"),
-        icon: ThermometerHalfIcon,
-    },
-];
+    useEffect(() => {
+        readOsIds()
+                .then(ids => {
+                    setOsIds(ids);
+                    setPackages(pcpPackages(ids));
+                })
+                .catch(() => setPackages(null));
+    }, []);
 
-// Sub-features that are flags/enums rather than measurements (e.g. temp1_crit_alarm, temp1_type)
-const isFlagKey = (key: string): boolean => /(alarm|beep|fault|type)$/.test(key);
+    const enable = () => {
+        setRunning(true);
+        setError(null);
+        enableHistory(osIds)
+                .then(onEnabled)
+                .catch((err: Error) => {
+                    setError(err.message);
+                    setRunning(false);
+                });
+    };
 
-// Parse the output of `sensors -u`, for lm-sensors versions without JSON support (-j)
-const parseSensorsRaw = (output: string): SensorData => {
-    const data: SensorData = {};
-    let chip: SensorChipGroup | null = null;
-    let label: string | null = null;
-
-    for (const line of output.split("\n")) {
-        if (!line.trim()) {
-            chip = null;
-            continue;
-        }
-        if (chip === null) {
-            chip = {};
-            data[line.trim()] = chip;
-            label = null;
-            continue;
-        }
-        if (line.startsWith("Adapter:")) {
-            chip.Adapter = line.slice("Adapter:".length).trim();
-            continue;
-        }
-        if (!/^\s/.test(line) && line.trimEnd().endsWith(":")) {
-            label = line.trimEnd().slice(0, -1);
-            chip[label] = {};
-            continue;
-        }
-        const match = /^\s+(\S+):\s+(\S+)/.exec(line);
-        if (match && label !== null) {
-            const value = parseFloat(match[2]);
-            if (!isNaN(value))
-                (chip[label] as SensorValueGroup)[match[1]] = value;
-        }
-    }
-
-    return data;
-};
-
-const getOsIds = (osRelease: string): string[] => {
-    const field = (name: string) => new RegExp(`^${name}=(.+)$`, "m").exec(osRelease)?.[1].replace(/"/g, "") ?? "";
-    return [field("ID"), ...field("ID_LIKE").split(" ")].filter(Boolean);
+    return (
+        <Modal isOpen variant="medium" onClose={running ? undefined : onClose} aria-labelledby="enable-history-title">
+            <ModalHeader title={_("Enable sensor history")} labelId="enable-history-title" />
+            <ModalBody>
+                <Content>
+                    <p>
+                        {_("Sensor history is recorded with Performance Co-Pilot (PCP), the same service that powers Cockpit's Metrics and history page.")}
+                    </p>
+                    {packages === null
+                        ? <p>{_("PCP packages are not available for this distribution. Install PCP and its lm-sensors agent manually.")}</p>
+                        : (
+                            <>
+                                <p>{_("This will:")}</p>
+                                <ul>
+                                    <li>
+                                        {packages
+                                            ? cockpit.format(_("install the packages $0, if missing"), packages.join(", "))
+                                            : _("install PCP, if missing")}
+                                    </li>
+                                    <li>{_("enable the PCP lm-sensors agent (pmdalmsensors)")}</li>
+                                    <li>{_("record all sensor readings every minute with pmlogger")}</li>
+                                </ul>
+                                <p>
+                                    {_("History is kept as long as pmlogger keeps its archives (14 days by default).")}
+                                </p>
+                            </>
+                        )}
+                </Content>
+                {error && <Alert isInline variant="danger" title={_("Enabling sensor history failed")}>{error}</Alert>}
+            </ModalBody>
+            <ModalFooter>
+                <Button variant="primary" onClick={enable} isLoading={running} isDisabled={running || !packages}>
+                    {_("Enable")}
+                </Button>
+                <Button variant="link" onClick={onClose} isDisabled={running}>
+                    {_("Cancel")}
+                </Button>
+            </ModalFooter>
+        </Modal>
+    );
 };
 
 const Application = () => {
-    // ---------------------------------------- //
-    // Hooks
-    // ---------------------------------------- //
     const [installed, setInstalled] = useState<boolean>(true);
     const [loading, setLoading] = useState<boolean>(false);
     const [alert, setAlert] = useState<AlertInfo>(null);
@@ -121,9 +110,10 @@ const Application = () => {
         () => localStorage.getItem("fahrenheitChecked") === "true"
     );
 
-    // ---------------------------------------- //
-    // Callbacks
-    // ---------------------------------------- //
+    const [historyStatus, setHistoryStatus] = useState<HistoryStatus>("loading");
+    const [showEnableHistory, setShowEnableHistory] = useState<boolean>(false);
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
     const loadSensors = useCallback(() => {
         if (loading || !installed) {
             return;
@@ -159,13 +149,16 @@ const Application = () => {
                 });
     }, [installed, loading, jsonSupported]);
 
-    // ---------------------------------------- //
-    // Helpers
-    // ---------------------------------------- //
+    const refreshHistoryStatus = useCallback(() => {
+        getHistoryStatus()
+                .then(setHistoryStatus)
+                .catch(() => setHistoryStatus("no-pcp"));
+    }, []);
+
     const getLmSensorsInstallCmd = async (): Promise<string[] | undefined> => {
         let osIds: string[] = [];
         try {
-            osIds = getOsIds(await cockpit.file("/etc/os-release").read());
+            osIds = await readOsIds();
         } catch (err: unknown) {
             setAlert({
                 msg: cockpit.format(_("Unable to detect OS: $0"), (err as Error).message),
@@ -228,53 +221,17 @@ const Application = () => {
         }
     };
 
-    const extractSensorGroup = (chip: SensorChipGroup, prefix: string) => {
-        const rows: Record<string, Record<string, number>> = {};
-        const regex = new RegExp(`^${prefix}\\d+_`);
-
-        for (const [label, values] of Object.entries(chip)) {
-            if (label === "Adapter" || typeof values !== "object") {
-                continue;
-            }
-
-            const entries = Object.entries(values).filter(([k]) => regex.test(k));
-
-            if (entries.length > 0) {
-                rows[label] = Object.fromEntries(entries);
-            }
-        }
-
-        return rows;
+    const toggleExpanded = (metric: string) => {
+        setExpanded(prev => {
+            const next = new Set(prev);
+            if (next.has(metric))
+                next.delete(metric);
+            else
+                next.add(metric);
+            return next;
+        });
     };
 
-    const getAllKeys = (rows: Record<string, Record<string, number>>) => {
-        const allKeys = new Set<string>();
-        for (const row of Object.values(rows)) {
-            Object.keys(row).forEach((key) => allKeys.add(key));
-        }
-        return Array.from(allKeys);
-    };
-
-    const formatSensorKey = (key: string): string => {
-        const idx = key.indexOf("_");
-        return idx !== -1 ? key.slice(idx + 1) : key;
-    };
-
-    const formatSensorValue = (categoryKey: string, key: string, value: number): string => {
-        if (isFlagKey(key)) {
-            return String(value);
-        }
-        if (categoryKey === "temp") {
-            return fahrenheitChecked
-                ? `${((value * 9) / 5 + 32).toFixed(1)} °F`
-                : `${value.toFixed(1)} °C`;
-        }
-        return categoryKey === "fan" ? value.toFixed(0) : value.toFixed(2);
-    };
-
-    // ---------------------------------------- //
-    // Effects
-    // ---------------------------------------- //
     useEffect(() => {
         const id = window.setInterval(() => {
             loadSensors();
@@ -283,91 +240,8 @@ const Application = () => {
         return () => clearInterval(id);
     }, [loadSensors]);
 
-    // ---------------------------------------- //
-    // Components
-    // ---------------------------------------- //
-    const SensorTable = ({
-        category,
-        chipData,
-    }: {
-        category: SensorCategory;
-        chipData: SensorChipGroup;
-    }) => {
-        const rows = extractSensorGroup(chipData, category.key);
-        if (!Object.keys(rows).length) {
-            return null;
-        }
+    useEffect(refreshHistoryStatus, [refreshHistoryStatus]);
 
-        const allKeys = getAllKeys(rows);
-
-        // Map stripped keys to a representative full key
-        const displayKeyMap: Record<string, string> = {};
-        for (const fullKey of allKeys) {
-            const stripped = formatSensorKey(fullKey);
-            if (!(stripped in displayKeyMap)) {
-                displayKeyMap[stripped] = fullKey;
-            }
-        }
-
-        const strippedKeys = Object.keys(displayKeyMap);
-
-        return (
-            <Card className="sensors-card">
-                <CardHeader>
-                    <CardTitle>
-                        <Flex spaceItems={{ default: "spaceItemsSm" }} alignItems={{ default: "alignItemsCenter" }}>
-                            <category.icon />
-                            <span>{category.label}</span>
-                        </Flex>
-                    </CardTitle>
-                </CardHeader>
-                <CardBody>
-                    <Table variant="compact" aria-label={category.label}>
-                        <Thead>
-                            <Tr>
-                                <Th>{_("Label")}</Th>
-                                {strippedKeys.map((strippedKey) => (
-                                    <Th key={strippedKey}>{strippedKey}</Th>
-                                ))}
-                            </Tr>
-                        </Thead>
-                        <Tbody>
-                            {Object.entries(rows).map(([label, values]) => {
-                                const max = Object.entries(values).find(([key]) => formatSensorKey(key) === "max")?.[1];
-                                return (
-                                    <Tr key={label}>
-                                        <Td dataLabel={_("Label")}>{label}</Td>
-                                        {strippedKeys.map((strippedKey) => {
-                                            const value = Object.entries(values).find(
-                                                ([key]) => formatSensorKey(key) === strippedKey,
-                                            )?.[1];
-                                            const critical = strippedKey === "input" && typeof value === "number" &&
-                                                typeof max === "number" && max !== 0 && value > max;
-                                            return (
-                                                <Td
-                                                    key={strippedKey}
-                                                    dataLabel={strippedKey}
-                                                    className={critical ? "sensors-value-critical" : ""}
-                                                >
-                                                    {typeof value === "number"
-                                                        ? formatSensorValue(category.key, strippedKey, value)
-                                                        : "—"}
-                                                </Td>
-                                            );
-                                        })}
-                                    </Tr>
-                                );
-                            })}
-                        </Tbody>
-                    </Table>
-                </CardBody>
-            </Card>
-        );
-    };
-
-    // ---------------------------------------- //
-    // Render
-    // ---------------------------------------- //
     return (
         <Page id="sensors" className="pf-m-no-sidebar">
             {alert != null &&
@@ -403,6 +277,10 @@ const Application = () => {
                         >
                             {_("Install lm-sensors")}
                         </Button>}
+                    {installed && historyStatus !== "loading" && historyStatus !== "enabled" &&
+                        <Button variant="secondary" onClick={() => setShowEnableHistory(true)}>
+                            {_("Enable history")}
+                        </Button>}
                 </Flex>
             </PageSection>
             {Object.keys(sensorData).length > 0 &&
@@ -421,9 +299,18 @@ const Application = () => {
                                     {cockpit.format(_("Adapter: $0"), chipData.Adapter ?? _("unknown"))}
                                 </p>
                                 <Stack hasGutter>
-                                    {sensorCategories.map((category) => (
+                                    {sensorCategories.filter((category) => Object.keys(extractSensorGroup(chipData, category.key)).length > 0).map((category) => (
                                         <StackItem key={category.key}>
-                                            <SensorTable category={category} chipData={chipData} />
+                                            <SensorTable
+                                                chipName={chipName}
+                                                chipData={chipData}
+                                                category={category}
+                                                fahrenheit={fahrenheitChecked}
+                                                expanded={expanded}
+                                                onToggle={toggleExpanded}
+                                                historyStatus={historyStatus}
+                                                onEnableHistory={() => setShowEnableHistory(true)}
+                                            />
                                         </StackItem>
                                     ))}
                                 </Stack>
@@ -431,6 +318,14 @@ const Application = () => {
                         ))}
                     </Tabs>
                 </PageSection>}
+            {showEnableHistory &&
+                <EnableHistoryModal
+                    onClose={() => setShowEnableHistory(false)}
+                    onEnabled={() => {
+                        setShowEnableHistory(false);
+                        refreshHistoryStatus();
+                    }}
+                />}
         </Page>
     );
 };

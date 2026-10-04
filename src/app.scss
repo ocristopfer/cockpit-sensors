@@ -10,3 +10,86 @@
     color: var(--pf-t--global--text--color--status--danger--default);
     font-weight: var(--pf-t--global--font--weight--body--bold);
 }
+
+.sensors-history {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pf-t--global--spacer--md);
+}
+
+.sensors-history-summary {
+    color: var(--pf-t--global--text--color--subtle);
+}
+
+.sensors-chart {
+    position: relative;
+    inline-size: 100%;
+
+    svg {
+        display: block;
+        overflow: visible;
+    }
+}
+
+.sensors-chart-grid {
+    stroke: var(--pf-t--global--border--color--default);
+    stroke-width: 1;
+}
+
+.sensors-chart-axis {
+    fill: var(--pf-t--global--text--color--subtle);
+    font-size: var(--pf-t--global--font--size--xs);
+}
+
+.sensors-chart-line {
+    fill: none;
+    stroke: var(--pf-t--global--color--brand--default);
+    stroke-width: 2;
+    stroke-linejoin: round;
+}
+
+.sensors-chart-threshold {
+    line {
+        stroke-dasharray: 6 4;
+        stroke-width: 1.5;
+    }
+
+    text {
+        font-size: var(--pf-t--global--font--size--xs);
+    }
+}
+
+.sensors-chart-threshold-warning {
+    line { stroke: var(--pf-t--global--color--status--warning--default); }
+    text { fill: var(--pf-t--global--text--color--status--warning--default); }
+}
+
+.sensors-chart-threshold-danger {
+    line { stroke: var(--pf-t--global--color--status--danger--default); }
+    text { fill: var(--pf-t--global--text--color--status--danger--default); }
+}
+
+.sensors-chart-hover {
+    line {
+        stroke: var(--pf-t--global--border--color--hover);
+        stroke-dasharray: 2 2;
+    }
+
+    circle {
+        fill: var(--pf-t--global--color--brand--default);
+        stroke: var(--pf-t--global--background--color--primary--default);
+        stroke-width: 2;
+    }
+}
+
+.sensors-chart-tooltip {
+    position: absolute;
+    pointer-events: none;
+    padding-block: var(--pf-t--global--spacer--xs);
+    padding-inline: var(--pf-t--global--spacer--sm);
+    border-radius: var(--pf-t--global--border--radius--small);
+    background: var(--pf-t--global--background--color--inverse--default);
+    color: var(--pf-t--global--text--color--inverse);
+    font-size: var(--pf-t--global--font--size--sm);
+    white-space: nowrap;
+}

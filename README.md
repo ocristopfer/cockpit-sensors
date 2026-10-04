@@ -11,6 +11,8 @@ reported by [lm-sensors](https://github.com/lm-sensors/lm-sensors): temperatures
   fans, voltages and temperatures
 - Live readings, refreshed every second
 - Values above the sensor's `max` limit are highlighted
+- Sensor history: expand any sensor to see its chart for the last hour, 24 hours or 7 days,
+  recorded with [Performance Co-Pilot (PCP)](https://pcp.io/) (see [Sensor history](#sensor-history))
 - Celsius or Fahrenheit (applies to all temperature limits; the choice is remembered)
 - Works with older lm-sensors versions without JSON output (`sensors -u` fallback)
 - Offers to install and configure lm-sensors when it is missing
@@ -57,6 +59,37 @@ rm -r cockpit-sensors cockpit-sensors.tar.xz
 ```
 
 Then reload Cockpit and open **Sensors** in the menu.
+
+# Sensor history
+
+![Sensor history](docs/history.png)
+
+Expand a sensor row to see how its reading changed over the last hour, 24 hours or 7 days,
+with the sensor's `max` and `crit` limits and the minimum, average and maximum of the period.
+
+The history is recorded by [Performance Co-Pilot (PCP)](https://pcp.io/), the same service behind
+Cockpit's *Metrics and history* page, so it keeps working when the Sensors page is closed.
+Click **Enable history** (administrator access required) and the module will:
+
+1. install `pcp` and `python3-pcp` (and `pcp-pmda-lmsensors` on Fedora, RHEL, CentOS and openSUSE), if missing;
+2. enable PCP's lm-sensors agent (`pmdalmsensors`), which exports every sensor as `lmsensors.<chip>.<sensor>`;
+3. add a `pmlogconf` group so that `pmlogger` records all sensors every minute.
+
+History is kept as long as pmlogger keeps its archives (14 days by default). The recorded
+metrics can also be used by other PCP tools, for example `pmval lmsensors.coretemp_isa_0000.core_0`
+or Grafana through `pmproxy`.
+
+On other distributions, install PCP and its lm-sensors agent manually and add this group as
+`$PCP_VAR_DIR/config/pmlogconf/cockpit-sensors/lmsensors` (fields separated by tabs), then run
+`pmlogconf $PCP_VAR_DIR/config/pmlogger/config.default` and restart `pmlogger`:
+
+```
+#pmlogconf-setup 2.0
+ident	lm-sensors readings (temperatures, fans, voltages) for Cockpit Sensors
+force	include
+delta	1 minute
+	lmsensors
+```
 
 # Releasing
 
