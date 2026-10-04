@@ -3,6 +3,8 @@
  */
 
 import { Card, CardBody, CardHeader, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
+import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
+import { Tooltip } from "@patternfly/react-core/dist/esm/components/Tooltip/index.js";
 import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { ExpandableRowContent, Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table/dist/esm/components/Table/index.js";
 import cockpit from "cockpit";
@@ -11,10 +13,22 @@ import React from "react";
 import { HistoryPanel } from "./HistoryChart";
 import { hasHistory, pcpMetricName } from "./history";
 import type { HistoryStatus } from "./history";
-import { extractSensorGroup, formatSensorKey, formatSensorValue, getSubFeature } from "./sensors";
-import type { SensorCategory, SensorChipGroup } from "./sensors";
+import { extractSensorGroup, formatSensorKey, formatSensorValue, getSubFeature, isFlagKey, sensorStatus, subFeatureLabel } from "./sensors";
+import type { SensorCategory, SensorChipGroup, SensorStatus } from "./sensors";
 
 const _ = cockpit.gettext;
+
+export const StatusLabel = ({ status }: { status: SensorStatus }) => {
+    if (status.level === "ok")
+        return <Label isCompact variant="outline" status="success">{_("Normal")}</Label>;
+
+    const label = (
+        <Label isCompact status={status.level === "critical" ? "danger" : "warning"}>
+            {status.level === "critical" ? _("Critical") : _("Warning")}
+        </Label>
+    );
+    return <Tooltip content={status.reasons.join(", ")}>{label}</Tooltip>;
+};
 
 export const SensorTable = ({ chipName, chipData, category, fahrenheit, expanded, onToggle, historyStatus, onEnableHistory }: {
     chipName: string;
@@ -31,12 +45,13 @@ export const SensorTable = ({ chipName, chipData, category, fahrenheit, expanded
         return null;
     }
 
-    // columns: the sub-features ("input", "max", ...) present in any row, in order of appearance
+    // columns: the sub-features ("input", "max", ...) present in any row, in order of appearance;
+    // alarm and fault flags are summarized in the status column instead
     const columns: string[] = [];
     for (const values of Object.values(rows)) {
         for (const key of Object.keys(values)) {
             const stripped = formatSensorKey(key);
-            if (!columns.includes(stripped))
+            if (!isFlagKey(stripped) && !columns.includes(stripped))
                 columns.push(stripped);
         }
     }
@@ -57,8 +72,9 @@ export const SensorTable = ({ chipName, chipData, category, fahrenheit, expanded
                         <Tr>
                             <Th screenReaderText={_("Show history")} />
                             <Th>{_("Label")}</Th>
+                            <Th>{_("Status")}</Th>
                             {columns.map((column) => (
-                                <Th key={column}>{column}</Th>
+                                <Th key={column}>{subFeatureLabel(column)}</Th>
                             ))}
                         </Tr>
                     </Thead>
@@ -68,6 +84,7 @@ export const SensorTable = ({ chipName, chipData, category, fahrenheit, expanded
                         const isExpanded = withHistory && expanded.has(metric);
                         const max = getSubFeature(values, "max");
                         const crit = getSubFeature(values, "crit");
+                        const status = sensorStatus(category.key, values);
 
                         return (
                             <Tbody key={label} isExpanded={isExpanded}>
@@ -76,15 +93,15 @@ export const SensorTable = ({ chipName, chipData, category, fahrenheit, expanded
                                         ? <Td expand={{ rowIndex, isExpanded, onToggle: () => onToggle(metric), expandId: `history-${metric}` }} />
                                         : <Td />}
                                     <Td dataLabel={_("Label")}>{label}</Td>
+                                    <Td dataLabel={_("Status")}><StatusLabel status={status} /></Td>
                                     {columns.map((column) => {
                                         const value = getSubFeature(values, column);
-                                        const critical = column === "input" && typeof value === "number" &&
-                                            typeof max === "number" && max !== 0 && value > max;
+                                        const highlight = (column === "input" || column === "average") && status.level !== "ok";
                                         return (
                                             <Td
                                                 key={column}
-                                                dataLabel={column}
-                                                className={critical ? "sensors-value-critical" : ""}
+                                                dataLabel={subFeatureLabel(column)}
+                                                className={highlight ? `sensors-value-${status.level}` : ""}
                                             >
                                                 {typeof value === "number"
                                                     ? formatSensorValue(category.key, column, value, fahrenheit)
@@ -95,7 +112,7 @@ export const SensorTable = ({ chipName, chipData, category, fahrenheit, expanded
                                 </Tr>
                                 {isExpanded &&
                                     <Tr isExpanded>
-                                        <Td colSpan={columns.length + 2}>
+                                        <Td colSpan={columns.length + 3}>
                                             <ExpandableRowContent>
                                                 <HistoryPanel
                                                     metric={metric}

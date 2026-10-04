@@ -14,14 +14,16 @@ import { Tab, Tabs, TabTitleText } from "@patternfly/react-core/dist/esm/compone
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { ExclamationCircleIcon } from "@patternfly/react-icons/dist/esm/icons/exclamation-circle-icon.js";
+import { ExclamationTriangleIcon } from "@patternfly/react-icons/dist/esm/icons/exclamation-triangle-icon.js";
 import cockpit from "cockpit";
 import React, { useCallback, useEffect, useState } from "react";
 
 import { enableHistory, getHistoryStatus, pcpPackages } from "./history";
 import type { HistoryStatus } from "./history";
 import { SensorTable } from "./SensorTable";
-import { extractSensorGroup, parseSensorsRaw, readOsIds, sensorCategories } from "./sensors";
-import type { SensorData } from "./sensors";
+import { chipDisplayNames, chipStatuses, extractSensorGroup, parseSensorsRaw, readOsIds, sensorCategories, worstLevel } from "./sensors";
+import type { SensorData, SensorStatusLevel } from "./sensors";
 
 const _ = cockpit.gettext;
 
@@ -96,6 +98,14 @@ const EnableHistoryModal = ({ onClose, onEnabled }: { onClose: () => void; onEna
             </ModalFooter>
         </Modal>
     );
+};
+
+export const StatusIcon = ({ level }: { level: SensorStatusLevel }) => {
+    if (level === "critical")
+        return <ExclamationCircleIcon className="sensors-status-icon-critical" aria-label={_("Critical")} />;
+    if (level === "warning")
+        return <ExclamationTriangleIcon className="sensors-status-icon-warning" aria-label={_("Warning")} />;
+    return null;
 };
 
 const Application = () => {
@@ -242,6 +252,8 @@ const Application = () => {
 
     useEffect(refreshHistoryStatus, [refreshHistoryStatus]);
 
+    const chipNames = chipDisplayNames(Object.keys(sensorData));
+
     return (
         <Page id="sensors" className="pf-m-no-sidebar">
             {alert != null &&
@@ -293,9 +305,18 @@ const Application = () => {
                             <Tab
                                 key={chipName}
                                 eventKey={index}
-                                title={<TabTitleText>{chipName}</TabTitleText>}
+                                title={
+                                    <TabTitleText>
+                                        <Flex spaceItems={{ default: "spaceItemsSm" }} alignItems={{ default: "alignItemsCenter" }} flexWrap={{ default: "nowrap" }}>
+                                            <span>{chipNames[chipName]}</span>
+                                            <StatusIcon level={worstLevel(chipStatuses(chipData).map(s => s.status.level))} />
+                                        </Flex>
+                                    </TabTitleText>
+                                }
                             >
                                 <p className="sensors-adapter">
+                                    {cockpit.format(_("Chip: $0"), chipName)}
+                                    {" · "}
                                     {cockpit.format(_("Adapter: $0"), chipData.Adapter ?? _("unknown"))}
                                 </p>
                                 <Stack hasGutter>

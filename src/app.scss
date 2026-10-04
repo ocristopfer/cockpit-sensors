@@ -11,6 +11,11 @@
     font-weight: var(--pf-t--global--font--weight--body--bold);
 }
 
+.sensors-card td.sensors-value-warning {
+    color: var(--pf-t--global--text--color--status--warning--default);
+    font-weight: var(--pf-t--global--font--weight--body--bold);
+}
+
 .sensors-history {
     display: flex;
     flex-direction: column;
@@ -92,4 +97,12 @@
     color: var(--pf-t--global--text--color--inverse);
     font-size: var(--pf-t--global--font--size--sm);
     white-space: nowrap;
+}
+
+.sensors-status-icon-critical {
+    color: var(--pf-t--global--icon--color--status--danger--default);
+}
+
+.sensors-status-icon-warning {
+    color: var(--pf-t--global--icon--color--status--warning--default);
 }
