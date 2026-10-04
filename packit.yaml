@@ -7,9 +7,9 @@ specfile_path: cockpit-sensors.spec
 copy_upstream_release_description: true
 
 srpm_build_deps:
+  - jq
   - make
   - nodejs-npm
-  - jq
 
 actions:
   post-upstream-clone:
@@ -22,23 +22,18 @@ actions:
   get-current-version: make print-version
 
 jobs:
-  - job: copr_build
-    trigger: pull_request
-    targets:
-      - fedora-all
-      - fedora-latest-aarch64
-      - centos-stream-8
-      - centos-stream-9
-      - centos-stream-9-aarch64
-
   - job: tests
     trigger: pull_request
-    targets:
+    targets: &test_targets
       - fedora-all
-      - fedora-latest-aarch64
-      - centos-stream-8
+      - fedora-latest-stable-aarch64
       - centos-stream-9
       - centos-stream-9-aarch64
+      - centos-stream-10
+
+  - job: copr_build
+    trigger: pull_request
+    targets: *test_targets
 
   # Build releases in COPR: https://packit.dev/docs/configuration/#copr_build
   - job: copr_build

@@ -11,23 +11,30 @@ jobs:
   source:
     runs-on: ubuntu-latest
     container:
-      image: quay.io/cockpit/tasks:latest
+      image: ghcr.io/cockpit-project/tasks:latest
       options: --user root
     permissions:
       # create GitHub release
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Install gh
+        run: dnf install -y gh
+
       # https://github.blog/2022-04-12-git-security-vulnerability-announced/
       - name: Pacify git's permission check
         run: git config --global --add safe.directory /__w/cockpit-sensors/cockpit-sensors
 
       - name: Workaround for https://github.com/actions/checkout/pull/697
-        run: git fetch --force origin $(git describe --tags):refs/tags/$(git describe --tags)
+        run: |
+          TAG_VERSION="$(git describe --tags)"
+          git fetch --force origin ${TAG_VERSION}:refs/tags/${TAG_VERSION}
 
       - name: Build release
         run: make dist

@@ -18,8 +18,10 @@
     "stylelint:fix": "stylelint --fix src/*.{css,scss}"
   },
   "devDependencies": {
-    "chrome-remote-interface": "0.33.0",
-    "esbuild-wasm": "0.27.4",
+    "@types/react": "18.3.13",
+    "@types/react-dom": "18.3.1",
+    "@typescript-eslint/eslint-plugin": "8.71.0",
+    "esbuild-wasm": "0.28.2",
     "eslint": "8.57.1",
     "eslint-config-standard": "17.1.0",
     "eslint-config-standard-jsx": "11.0.0",
@@ -29,22 +31,23 @@
     "eslint-plugin-promise": "6.6.0",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "4.6.2",
-    "qunit": "2.25.0",
-    "stylelint": "17.6.0",
-    "stylelint-config-recommended-scss": "17.0.0",
+    "qunit": "3.0.0",
+    "stylelint": "17.15.0",
+    "stylelint-config-recommended-scss": "17.0.1",
     "stylelint-config-standard": "40.0.0",
     "stylelint-config-standard-scss": "17.0.0",
-    "stylelint-formatter-pretty": "4.0.1"
+    "stylelint-formatter-pretty": "4.0.1",
+    "typescript": "6.0.3"
   },
   "dependencies": {
     "@patternfly/patternfly": "6.1.0",
     "@patternfly/react-core": "6.1.0",
     "@patternfly/react-icons": "6.1.0",
-    "@patternfly/react-styles": "6.4.0",
-    "argparse": "2.0.1",
-    "esbuild": "0.27.4",
+    "@patternfly/react-styles": "6.6.1",
+    "argparse": "3.0.2",
+    "esbuild": "0.28.2",
     "esbuild-sass-plugin": "3.7.0",
-    "gettext-parser": "9.0.2",
+    "gettext-parser": "9.1.1",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   }

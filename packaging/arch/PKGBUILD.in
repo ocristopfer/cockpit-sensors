@@ -1,0 +1,15 @@
+pkgname=cockpit-sensors
+pkgver=VERSION
+pkgrel=1
+pkgdesc='Cockpit module that displays all data reported by lm-sensors'
+arch=('any')
+url='https://github.com/ocristopfer/cockpit-sensors'
+license=(LGPL)
+source=("SOURCE")
+sha256sums=('SKIP')
+
+package() {
+  depends=(cockpit lm_sensors)
+  cd $pkgname
+  make DESTDIR="$pkgdir" install PREFIX=/usr
+}

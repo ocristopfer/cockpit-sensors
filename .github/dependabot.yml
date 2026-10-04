@@ -15,12 +15,41 @@ updates:
       esbuild:
         patterns:
           - "esbuild*"
-      stylelint:
-        patterns:
-          - "stylelint*"
       patternfly:
         patterns:
           - "@patternfly*"
+      react:
+        patterns:
+          - "react*"
+      stylelint:
+        patterns:
+          - "stylelint*"
+      types:
+        patterns:
+          - "@types*"
+          - "types*"
+
+    ignore:
+      # https://github.com/cockpit-project/cockpit/issues/21151
+      - dependency-name: "sass"
+        versions: [">=1.80.0", "2.x"]
+
+      # needs to be done in Cockpit first
+      - dependency-name: "@patternfly/*"
+        update-types: ["version-update:semver-major"]
+
+      # PF5 requires React 18
+      - dependency-name: "*react*"
+        update-types: ["version-update:semver-major"]
+
+      # The plugins we use didn't work with anything after 8 at some point
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+
+      # @typescript-eslint is incompatible with TS 7
+      # https://github.com/typescript-eslint/typescript-eslint/issues/12518
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -28,4 +57,8 @@ updates:
     labels:
       - "no-test"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    groups:
+      actions:
+        patterns:
+          - "*"

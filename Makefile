@@ -33,8 +33,7 @@ COCKPIT_REPO_FILES = \
 	$(NULL)
 
 COCKPIT_REPO_URL = https://github.com/cockpit-project/cockpit.git
-COCKPIT_REPO_COMMIT = 55c69ecfa5af4745aa5abe2ab407f8c4f2e7b857 # 358 + 21 commits
-
+COCKPIT_REPO_COMMIT = 566c1ca3cee80285f988b0d503d6f3118add0a79 # 368 + 9 commits
 
 $(COCKPIT_REPO_FILES): $(COCKPIT_REPO_STAMP)
 COCKPIT_REPO_TREE = '$(strip $(COCKPIT_REPO_COMMIT))^{tree}'
@@ -58,7 +57,8 @@ po/$(PACKAGE_NAME).js.pot:
 		--keyword=ngettext:1,2,3t --keyword=ngettext:1c,2,3,4t \
 		--keyword=gettextCatalog.getString:1,3c --keyword=gettextCatalog.getPlural:2,3,4c \
 		--from-code=UTF-8 $$(find src/ -name '*.[jt]s' -o -name '*.[jt]sx') | \
-		sed '/^#/ s/, c-format//' > $@
+		sed '/^#/ s/, c-format//' > $@ && \
+		sed -i 's/charset=CHARSET/charset=UTF-8/g' $@
 
 po/$(PACKAGE_NAME).html.pot: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
 	pkg/lib/html2po -o $@ $$(find src -name '*.html')
@@ -67,10 +67,11 @@ po/$(PACKAGE_NAME).manifest.pot: $(COCKPIT_REPO_STAMP)
 	pkg/lib/manifest2po -o $@ src/manifest.json
 
 po/$(PACKAGE_NAME).metainfo.pot: $(APPSTREAMFILE)
-	xgettext --default-domain=$(PACKAGE_NAME) --output=$@ $<
+	xgettext --default-domain=$(PACKAGE_NAME) --output=$@ $< && \
+	sed -i 's/charset=CHARSET/charset=UTF-8/g' $@
 
 po/$(PACKAGE_NAME).pot: po/$(PACKAGE_NAME).html.pot po/$(PACKAGE_NAME).js.pot po/$(PACKAGE_NAME).manifest.pot po/$(PACKAGE_NAME).metainfo.pot
-	msgcat --sort-output --output-file=$@ $^
+	xgettext --output=$@ $^
 
 po/LINGUAS:
 	echo $(LINGUAS) | tr ' ' '\n' > $@
@@ -83,6 +84,9 @@ $(SPEC): packaging/$(SPEC).in $(DIST_TEST)
 	provides=$$(awk '{print "Provides: bundled(npm(" $$1 ")) = " $$2}' runtime-npm-modules.txt); \
 	awk -v p="$$provides" '{gsub(/%{VERSION}/, "$(VERSION)"); gsub(/%{NPM_PROVIDES}/, p)}1' $< > $@
 
+packaging/arch/PKGBUILD: packaging/arch/PKGBUILD.in
+	sed 's/VERSION/$(VERSION)/; s/SOURCE/$(TARFILE)/' $< > $@
+
 $(DIST_TEST): $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP) $(shell find src/ -type f) package.json build.js
 	NODE_ENV=$(NODE_ENV) ./build.js
 
@@ -91,7 +95,7 @@ watch: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
 
 clean:
 	rm -rf dist/
-	rm -f $(SPEC)
+	rm -f $(SPEC) packaging/arch/PKGBUILD
 	rm -f po/LINGUAS
 	rm -f metafile.json runtime-npm-modules.txt
 
@@ -124,12 +128,12 @@ dist: $(TARFILE)
 # pre-built dist/ (so it's not necessary) and ship package-lock.json (so that
 # node_modules/ can be reconstructed if necessary)
 $(TARFILE): export NODE_ENV=production
-$(TARFILE): $(DIST_TEST) $(SPEC)
+$(TARFILE): $(DIST_TEST) $(SPEC) packaging/arch/PKGBUILD
 	if type appstream-util >/dev/null 2>&1; then appstream-util validate-relax --nonet *.metainfo.xml; fi
 	tar --xz $(TAR_ARGS) -cf $(TARFILE) --transform 's,^,$(RPM_NAME)/,' \
 		--exclude packaging/$(SPEC).in --exclude node_modules \
 		$$(git ls-files) $(COCKPIT_REPO_FILES) $(NODE_MODULES_TEST) $(DIST_TEST) \
-		$(SPEC) dist/
+		$(SPEC) packaging/arch/PKGBUILD dist/
 
 $(NODE_CACHE): $(NODE_MODULES_TEST)
 	tools/node-modules runtime-tar $(NODE_CACHE)

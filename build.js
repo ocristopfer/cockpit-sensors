@@ -17,24 +17,33 @@ const useWasm = os.arch() !== 'x64';
 
 const esbuild = await (async () => {
     try {
+        // Try node_modules first for installs with devDependencies
         return (await import(useWasm ? 'esbuild-wasm' : 'esbuild')).default;
     } catch (e) {
         if (e.code !== 'ERR_MODULE_NOT_FOUND')
             throw e;
+
+        // Fall back to distro package (e.g. Debian's /usr/lib/*/nodejs/esbuild)
+        // Use createRequire to leverage Node's module resolution which searches system paths
+        // Use require.resolve to find esbuild in system paths, then import it
         const require = createRequire(import.meta.url);
         return (await import(require.resolve('esbuild'))).default;
     }
 })();
 
 const production = process.env.NODE_ENV === 'production';
+// List of directories to use when using import statements
 const nodePaths = ['pkg/lib'];
 const outdir = 'dist';
 
+// Obtain package name from package.json
 const packageJson = JSON.parse(fs.readFileSync('package.json'));
 
 const parser = (await import('argparse')).default.ArgumentParser();
+/* eslint-disable max-len */
 parser.add_argument('-r', '--rsync', { help: "rsync bundles to ssh target after build", metavar: "HOST" });
 parser.add_argument('-w', '--watch', { action: 'store_true', help: "Enable watch mode", default: process.env.ESBUILD_WATCH === "true" });
+/* eslint-enable max-len */
 const args = parser.parse_args();
 
 if (args.rsync)
@@ -136,6 +145,7 @@ try {
         // Extract bundled npm packages for dependency tracking
         const bundledPackages = new Set();
         for (const inputPath of Object.keys(result.metafile.inputs)) {
+            // Match paths like node_modules/package-name/ or node_modules/@scope/package-name/
             const match = inputPath.match(/^node_modules\/(@[^/]+\/[^/]+|[^/]+)\//);
             if (match)
                 bundledPackages.add(match[1]);
