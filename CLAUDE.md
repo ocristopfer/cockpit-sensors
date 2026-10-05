@@ -9,6 +9,8 @@ their history recorded with PCP. Sources are in `src/`, built with `./build.js` 
   (set `git config user.name "Cristopfer Luis"` and `git config user.email ocristopfer@gmail.com`).
 - Do **not** add `Co-Authored-By: Claude ...`, `Claude-Session: ...` or any other AI
   attribution trailer to commit messages or pull request descriptions.
+- Branch names must not mention Claude or AI either; use descriptive names such as
+  `feat/<topic>` or `fix/<topic>`.
 
 ## Checks before pushing
 
