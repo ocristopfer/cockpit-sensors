@@ -122,7 +122,8 @@ The history is recorded by [Performance Co-Pilot (PCP)](https://pcp.io/), the sa
 Cockpit's *Metrics and history* page, so it keeps working when the Sensors page is closed.
 Click **Enable history** (administrator access required) and the module will:
 
-1. install `pcp` and `python3-pcp` (and `pcp-pmda-lmsensors` on Fedora, RHEL, CentOS and openSUSE), if missing;
+1. install `pcp`, `python3-pcp` and `cockpit-pcp`, which lets Cockpit read the recorded history
+   (and `pcp-pmda-lmsensors` on Fedora, RHEL, CentOS and openSUSE), if missing;
 2. enable PCP's lm-sensors agent (`pmdalmsensors`), which exports every sensor as `lmsensors.<chip>.<sensor>`;
 3. add a `pmlogconf` group so that `pmlogger` records all sensors every minute.
 
@@ -130,7 +131,7 @@ History is kept as long as pmlogger keeps its archives (14 days by default). The
 metrics can also be used by other PCP tools, for example `pmval lmsensors.coretemp_isa_0000.core_0`
 or Grafana through `pmproxy`.
 
-On other distributions, install PCP and its lm-sensors agent manually and add this group as
+On other distributions, install PCP, its lm-sensors agent and `cockpit-pcp` manually and add this group as
 `$PCP_VAR_DIR/config/pmlogconf/cockpit-sensors/lmsensors` (fields separated by tabs), then run
 `pmlogconf $PCP_VAR_DIR/config/pmlogger/config.default` and restart `pmlogger`:
 

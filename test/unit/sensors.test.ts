@@ -182,8 +182,8 @@ QUnit.module("history", () => {
     });
 
     QUnit.test("pcpPackages", assert => {
-        assert.deepEqual(pcpPackages(["ubuntu", "debian"]), ["pcp", "python3-pcp"]);
-        assert.deepEqual(pcpPackages(["rocky", "rhel"]), ["pcp", "python3-pcp", "pcp-pmda-lmsensors"]);
+        assert.deepEqual(pcpPackages(["ubuntu", "debian"]), ["pcp", "python3-pcp", "cockpit-pcp"]);
+        assert.deepEqual(pcpPackages(["rocky", "rhel"]), ["pcp", "python3-pcp", "pcp-pmda-lmsensors", "cockpit-pcp"]);
         assert.equal(pcpPackages(["arch"]), null);
     });
 
