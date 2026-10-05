@@ -7,16 +7,23 @@ reported by [lm-sensors](https://github.com/lm-sensors/lm-sensors): temperatures
 
 # Features
 
-- One tab per sensor chip (CPU, motherboard Super I/O, NVMe, GPU, ACPI, ...), grouped into
-  fans, voltages and temperatures
-- Live readings, refreshed every second
-- Values above the sensor's `max` limit are highlighted
+- **Overview** of all sensor chips at a glance: hottest temperature, running fans, power draw
+  and the sensors that need attention
+- One tab per sensor chip, named after its driver (CPU, GPU, NVMe drive, Motherboard, ...),
+  grouped into temperatures, fans, voltages, power, currents, energy, humidity and chassis intrusion
+- A **status** for every sensor (Normal, Warning, Critical) from the alarm and fault flags of the chip
+  and its `min`, `max`, `crit`, `lcrit` and `emergency` limits: overheating, stopped fans,
+  low voltages, opened chassis, ...; tabs with a sensor in trouble get a warning icon
+- Live readings with a sparkline of the last readings and the lowest/highest value since the page
+  was opened; refresh every 1, 2, 5 or 10 seconds, paused while the page is not visible
+- Filter sensors by name; rename or hide sensors and whole chips (remembered in the browser)
 - Sensor history: expand any sensor to see its chart for the last hour, 24 hours or 7 days,
-  recorded with [Performance Co-Pilot (PCP)](https://pcp.io/) (see [Sensor history](#sensor-history))
+  recorded with [Performance Co-Pilot (PCP)](https://pcp.io/), and export it as CSV
+  (see [Sensor history](#sensor-history))
 - Celsius or Fahrenheit (applies to all temperature limits; the choice is remembered)
 - Works with older lm-sensors versions without JSON output (`sensors -u` fallback)
 - Offers to install and configure lm-sensors when it is missing
-  (Debian/Ubuntu, Fedora/RHEL/CentOS, openSUSE, Arch, Alpine)
+  (Debian/Ubuntu, Fedora/RHEL/CentOS, openSUSE, Arch, Alpine), and to detect sensors when none is found
 - Follows the Cockpit look, including dark mode
 
 # Installation
@@ -80,6 +87,7 @@ Then reload Cockpit and open **Sensors** in the menu.
 
 Expand a sensor row to see how its reading changed over the last hour, 24 hours or 7 days,
 with the sensor's `max` and `crit` limits and the minimum, average and maximum of the period.
+**Export CSV** saves the shown period as a CSV file (time in UTC, value in the displayed unit).
 
 The history is recorded by [Performance Co-Pilot (PCP)](https://pcp.io/), the same service behind
 Cockpit's *Metrics and history* page, so it keeps working when the Sensors page is closed.
@@ -103,6 +111,17 @@ ident	lm-sensors readings (temperatures, fans, voltages) for Cockpit Sensors
 force	include
 delta	1 minute
 	lmsensors
+```
+
+# Development
+
+```shell
+make pkg/lib/cockpit-po-plugin.js   # fetch Cockpit's pkg/lib once
+npm install
+npm run build                       # or: make watch
+npm run eslint && npm run stylelint && npx tsc --noEmit
+npm run test:unit                   # unit tests (QUnit) of the parsing, formatting and status logic
+make check                          # integration tests in a Cockpit test VM
 ```
 
 # Releasing

@@ -374,7 +374,12 @@ const Application = () => {
         expanded,
         onToggleExpanded: toggleExpanded,
         onEnableHistory: () => setShowEnableHistory(true),
-        onSetHidden: (key, hide) => setHiddenList(hide ? [...hiddenList, key] : hiddenList.filter(k => k !== key)),
+        onSetHidden: (key, hide) => {
+            const next = hide ? [...hiddenList, key] : hiddenList.filter(k => k !== key);
+            setHiddenList(next);
+            if (next.length === 0)
+                setShowHidden(false);
+        },
         onRename: (key, name) => setRenaming({ key, name }),
     };
 
@@ -469,7 +474,7 @@ const Application = () => {
         );
     } else if (loaded) {
         body = (
-            <Tabs activeKey={activeTab} onSelect={(_event, eventKey) => setActiveTabKey(String(eventKey))}>
+            <Tabs mountOnEnter unmountOnExit activeKey={activeTab} onSelect={(_event, eventKey) => setActiveTabKey(String(eventKey))}>
                 {[
                     <Tab key={OVERVIEW_TAB} eventKey={OVERVIEW_TAB} title={<TabTitleText>{_("Overview")}</TabTitleText>}>
                         <div className="sensors-tab-body">

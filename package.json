@@ -18,7 +18,8 @@
     "eslint": "eslint src/",
     "eslint:fix": "eslint --fix src/",
     "stylelint": "stylelint src/*.{css,scss}",
-    "stylelint:fix": "stylelint --fix src/*.{css,scss}"
+    "stylelint:fix": "stylelint --fix src/*.{css,scss}",
+    "test:unit": "node test/unit/run.mjs"
   },
   "devDependencies": {
     "@types/react": "18.3.13",

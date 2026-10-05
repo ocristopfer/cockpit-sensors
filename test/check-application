@@ -6,6 +6,30 @@
 
 import testlib
 
+# `sensors -j` of a fictional machine with a few sensors in trouble
+FAKE_SENSORS = """#!/bin/sh
+[ "$1" = "-j" ] || { echo "invalid option -- $1" >&2; exit 1; }
+cat <<'JSON'
+{
+  "coretemp-isa-0000": {
+    "Adapter": "ISA adapter",
+    "Core 0": {"temp2_input": 45.0, "temp2_max": 80.0, "temp2_crit": 100.0, "temp2_crit_alarm": 0.0},
+    "Core 1": {"temp3_input": 85.0, "temp3_max": 80.0, "temp3_crit": 100.0, "temp3_crit_alarm": 0.0}
+  },
+  "nct6798-isa-0290": {
+    "Adapter": "ISA adapter",
+    "fan1": {"fan1_input": 1150.0, "fan1_min": 300.0, "fan1_alarm": 0.0},
+    "fan2": {"fan2_input": 0.0, "fan2_min": 300.0, "fan2_alarm": 1.0},
+    "SYSTIN": {"temp1_input": 34.0, "temp1_max": 80.0, "temp1_type": 4.0}
+  },
+  "amdgpu-pci-0300": {
+    "Adapter": "PCI adapter",
+    "PPT": {"power1_average": 18.0, "power1_cap": 186.0}
+  }
+}
+JSON
+"""
+
 
 # Nondestructive tests all run in the same running VM. This allows them to run in Packit, Fedora, and
 # RHEL dist-git gating. They must not permanently change any file or configuration on the system in a
@@ -14,11 +38,57 @@ import testlib
 class TestApplication(testlib.MachineCase):
     def testBasic(self):
         b = self.browser
-        m = self.machine
 
         self.login_and_go("/sensors")
         # verify expected heading
         b.wait_text("#sensors .pf-v6-c-title", "Sensors")
+
+    def testFakeSensors(self):
+        b = self.browser
+        m = self.machine
+
+        # replace the real `sensors` by one with known readings, for this test only
+        m.write("/tmp/fake-sensors", FAKE_SENSORS, perm="755")
+        sensors = m.execute("command -v sensors").strip()
+        m.execute(f"mount --bind /tmp/fake-sensors {sensors}")
+        self.addCleanup(m.execute, f"umount {sensors}; rm -f /tmp/fake-sensors")
+
+        self.login_and_go("/sensors")
+
+        # overview: one card per chip, named after its driver, and the sensors in trouble
+        b.wait_in_text(".sensors-overview-summary", "1 critical, 1 warning")
+        b.wait_in_text(".sensors-overview-card:contains('CPU (Intel)')", "Highest: 85.0 °C (Core 1)")
+        b.wait_in_text(".sensors-overview-card:contains('Motherboard')",
+                       "fan2: Alarm reported by the chip, Fan stopped")
+        b.wait_in_text(".sensors-overview-card:contains('GPU')", "PPT: 18.00 W")
+
+        # chip tab: status of every sensor
+        b.click(".pf-v6-c-tabs__link:contains('Motherboard')")
+        b.wait_in_text("tr:contains('fan2')", "Critical")
+        b.wait_in_text("tr:contains('fan1')", "Normal")
+        b.wait_in_text("tr:contains('SYSTIN')", "34.0 °C")
+
+        # Fahrenheit
+        b.click("#unit-fahrenheit")
+        b.wait_in_text("tr:contains('SYSTIN')", "93.2 °F")
+        b.click("#unit-celsius")
+        b.wait_in_text("tr:contains('SYSTIN')", "34.0 °C")
+
+        # filter
+        b.set_input_text("#sensors-filter input", "fan1")
+        b.wait_visible("tr:contains('fan1')")
+        b.wait_not_present("tr:contains('fan2')")
+        b.set_input_text("#sensors-filter input", "")
+        b.wait_visible("tr:contains('fan2')")
+
+        # hide a chip, and show it again
+        b.click("button:contains('Hide this chip')")
+        b.wait_not_present(".pf-v6-c-tabs__link:contains('Motherboard')")
+        b.wait_not_present(".sensors-overview-card:contains('Motherboard')")
+        b.click("#show-hidden")
+        b.click(".pf-v6-c-tabs__link:contains('Motherboard')")
+        b.click("button:contains('Show this chip')")
+        b.wait_not_present("#show-hidden")
 
 
 if __name__ == '__main__':

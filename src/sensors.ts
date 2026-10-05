@@ -251,12 +251,14 @@ export const sensorStatus = (categoryKey: string, values: SensorValueGroup): Sen
     const crit = getSubFeature(values, "crit");
     const lcrit = getSubFeature(values, "lcrit");
     const emergency = getSubFeature(values, "emergency");
+    // some chips report min > max for unused inputs; such limits mean nothing
+    const limitsValid = !(isLimit(min) && isLimit(max) && min > max);
 
     if (isLimit(emergency) && reading >= emergency)
         raise("critical", _("Above the emergency limit"));
     else if (isLimit(crit) && reading >= crit)
         raise("critical", _("Above the critical limit"));
-    else if (isLimit(max) && reading > max)
+    else if (limitsValid && isLimit(max) && reading > max)
         raise("warning", _("Above the maximum"));
 
     if (categoryKey === "fan") {
@@ -266,8 +268,7 @@ export const sensorStatus = (categoryKey: string, values: SensorValueGroup): Sen
             raise("warning", _("Below the minimum"));
     } else if (isLimit(lcrit) && reading <= lcrit) {
         raise("critical", _("Below the critical limit"));
-    } else if (isLimit(min) && reading < min && !(isLimit(max) && min >= max)) {
-        // some chips report min >= max for unused inputs
+    } else if (limitsValid && isLimit(min) && reading < min) {
         raise("warning", _("Below the minimum"));
     }
 
