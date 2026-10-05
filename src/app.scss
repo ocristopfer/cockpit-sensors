@@ -11,6 +11,11 @@
     font-weight: var(--pf-t--global--font--weight--body--bold);
 }
 
+.sensors-card td.sensors-value-warning {
+    color: var(--pf-t--global--text--color--status--warning--default);
+    font-weight: var(--pf-t--global--font--weight--body--bold);
+}
+
 .sensors-history {
     display: flex;
     flex-direction: column;
@@ -92,4 +97,68 @@
     color: var(--pf-t--global--text--color--inverse);
     font-size: var(--pf-t--global--font--size--sm);
     white-space: nowrap;
+}
+
+.sensors-status-icon-critical {
+    color: var(--pf-t--global--icon--color--status--danger--default);
+}
+
+.sensors-status-icon-warning {
+    color: var(--pf-t--global--icon--color--status--warning--default);
+}
+
+.sensors-status-icon-ok {
+    color: var(--pf-t--global--icon--color--status--success--default);
+}
+
+.sensors-toolbar {
+    padding-block-end: 0;
+}
+
+.sensors-loading {
+    display: block;
+    margin-inline: auto;
+}
+
+.sensors-tab-body {
+    margin-block-start: var(--pf-t--global--spacer--md);
+}
+
+.sensors-original-name {
+    color: var(--pf-t--global--text--color--subtle);
+    font-size: var(--pf-t--global--font--size--sm);
+}
+
+.sensors-row-hidden td {
+    opacity: 0.6;
+}
+
+.sensors-sparkline {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--pf-t--global--spacer--sm);
+    white-space: nowrap;
+
+    polyline {
+        fill: none;
+        stroke: var(--pf-t--global--color--brand--default);
+        stroke-width: 1.5;
+        stroke-linejoin: round;
+    }
+}
+
+.sensors-sparkline-range {
+    color: var(--pf-t--global--text--color--subtle);
+    font-size: var(--pf-t--global--font--size--sm);
+}
+
+.sensors-overview-summary {
+    margin-block-end: var(--pf-t--global--spacer--md);
+}
+
+.sensors-overview-problems {
+    margin-block-start: var(--pf-t--global--spacer--sm);
+    padding: 0;
+    list-style: none;
+    font-size: var(--pf-t--global--font--size--sm);
 }
