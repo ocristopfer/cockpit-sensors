@@ -6,15 +6,20 @@ import { Card, CardBody, CardHeader, CardTitle } from "@patternfly/react-core/di
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
 import { Tooltip } from "@patternfly/react-core/dist/esm/components/Tooltip/index.js";
 import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
-import { ExpandableRowContent, Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table/dist/esm/components/Table/index.js";
+import { ActionsColumn, ExpandableRowContent, Table, Tbody, Td, Th, Thead, Tr } from "@patternfly/react-table/dist/esm/components/Table/index.js";
 import cockpit from "cockpit";
 import React from "react";
 
 import { HistoryPanel } from "./HistoryChart";
 import { hasHistory, pcpMetricName } from "./history";
-import type { HistoryStatus } from "./history";
-import { extractSensorGroup, formatSensorKey, formatSensorValue, getSubFeature, isFlagKey, sensorStatus, subFeatureLabel } from "./sensors";
+import {
+    extractSensorGroup, formatDisplayValue, formatSensorKey, formatSensorValue, getSubFeature, isFlagKey,
+    sensorStatus, subFeatureLabel, toDisplayValue
+} from "./sensors";
 import type { SensorCategory, SensorChipGroup, SensorStatus } from "./sensors";
+import { Sparkline } from "./Sparkline";
+import { sensorKey } from "./trend";
+import { isVisible, matchesFilter, useSensorView } from "./view";
 
 const _ = cockpit.gettext;
 
@@ -30,31 +35,43 @@ export const StatusLabel = ({ status }: { status: SensorStatus }) => {
     return <Tooltip content={status.reasons.join(", ")}>{label}</Tooltip>;
 };
 
-export const SensorTable = ({ chipName, chipData, category, fahrenheit, expanded, onToggle, historyStatus, onEnableHistory }: {
+// a sensor or chip label, with its original name when the user renamed it
+export const SensorName = ({ name, alias, hidden }: { name: string; alias: string | undefined; hidden: boolean }) => (
+    <Flex spaceItems={{ default: "spaceItemsSm" }} alignItems={{ default: "alignItemsCenter" }}>
+        <span>{alias || name}</span>
+        {alias && <span className="sensors-original-name">{name}</span>}
+        {hidden && <Label isCompact>{_("Hidden")}</Label>}
+    </Flex>
+);
+
+export const SensorTable = ({ chipName, chipData, category }: {
     chipName: string;
     chipData: SensorChipGroup;
     category: SensorCategory;
-    fahrenheit: boolean;
-    expanded: Set<string>;
-    onToggle: (metric: string) => void;
-    historyStatus: HistoryStatus;
-    onEnableHistory: () => void;
 }) => {
-    const rows = extractSensorGroup(chipData, category.key);
-    if (!Object.keys(rows).length) {
+    const view = useSensorView();
+    const { onEnableHistory } = view;
+    const rows = Object.entries(extractSensorGroup(chipData, category.key)).filter(([label]) => {
+        const key = sensorKey(chipName, label);
+        return isVisible(view, key) && matchesFilter(view, label, view.aliases[key]);
+    });
+    if (!rows.length) {
         return null;
     }
 
     // columns: the sub-features ("input", "max", ...) present in any row, in order of appearance;
     // alarm and fault flags are summarized in the status column instead
     const columns: string[] = [];
-    for (const values of Object.values(rows)) {
+    for (const [, values] of rows) {
         for (const key of Object.keys(values)) {
             const stripped = formatSensorKey(key);
             if (!isFlagKey(stripped) && !columns.includes(stripped))
                 columns.push(stripped);
         }
     }
+
+    const convert = (value: number) => toDisplayValue(category.key, value, view.fahrenheit);
+    const format = (value: number) => formatDisplayValue(category.key, value, view.fahrenheit);
 
     return (
         <Card className="sensors-card">
@@ -74,25 +91,33 @@ export const SensorTable = ({ chipName, chipData, category, fahrenheit, expanded
                             <Th>{_("Label")}</Th>
                             <Th>{_("Status")}</Th>
                             {columns.map((column) => (
-                                <Th key={column}>{subFeatureLabel(column)}</Th>
+                                <Th key={column} modifier="wrap">{subFeatureLabel(column)}</Th>
                             ))}
+                            {category.key !== "intrusion" && <Th>{_("Recent")}</Th>}
+                            <Th screenReaderText={_("Actions")} />
                         </Tr>
                     </Thead>
-                    {Object.entries(rows).map(([label, values], rowIndex) => {
+                    {rows.map(([label, values], rowIndex) => {
+                        const key = sensorKey(chipName, label);
+                        const alias = view.aliases[key];
+                        const hidden = view.hidden.has(key);
                         const metric = pcpMetricName(chipName, label);
                         const withHistory = hasHistory(values);
-                        const isExpanded = withHistory && expanded.has(metric);
+                        const isExpanded = withHistory && view.expanded.has(metric);
                         const max = getSubFeature(values, "max");
                         const crit = getSubFeature(values, "crit");
                         const status = sensorStatus(category.key, values);
+                        const trend = view.trends.get(key);
 
                         return (
                             <Tbody key={label} isExpanded={isExpanded}>
-                                <Tr>
+                                <Tr className={hidden ? "sensors-row-hidden" : ""}>
                                     {withHistory
-                                        ? <Td expand={{ rowIndex, isExpanded, onToggle: () => onToggle(metric), expandId: `history-${metric}` }} />
+                                        ? <Td expand={{ rowIndex, isExpanded, onToggle: () => view.onToggleExpanded(metric), expandId: `history-${metric}` }} />
                                         : <Td />}
-                                    <Td dataLabel={_("Label")}>{label}</Td>
+                                    <Td dataLabel={_("Label")}>
+                                        <SensorName name={label} alias={alias} hidden={hidden} />
+                                    </Td>
                                     <Td dataLabel={_("Status")}><StatusLabel status={status} /></Td>
                                     {columns.map((column) => {
                                         const value = getSubFeature(values, column);
@@ -104,23 +129,42 @@ export const SensorTable = ({ chipName, chipData, category, fahrenheit, expanded
                                                 className={highlight ? `sensors-value-${status.level}` : ""}
                                             >
                                                 {typeof value === "number"
-                                                    ? formatSensorValue(category.key, column, value, fahrenheit)
+                                                    ? formatSensorValue(category.key, column, value, view.fahrenheit)
                                                     : "—"}
                                             </Td>
                                         );
                                     })}
+                                    {category.key !== "intrusion" &&
+                                        <Td dataLabel={_("Recent")}>
+                                            {trend && <Sparkline trend={trend} convert={convert} format={format} />}
+                                        </Td>}
+                                    <Td isActionCell>
+                                        <ActionsColumn
+                                            items={[
+                                                {
+                                                    title: _("Rename"),
+                                                    onClick: () => view.onRename(key, label),
+                                                },
+                                                {
+                                                    title: hidden ? _("Show") : _("Hide"),
+                                                    onClick: () => view.onSetHidden(key, !hidden),
+                                                },
+                                            ]}
+                                        />
+                                    </Td>
                                 </Tr>
                                 {isExpanded &&
                                     <Tr isExpanded>
-                                        <Td colSpan={columns.length + 3}>
+                                        <Td colSpan={columns.length + 5}>
                                             <ExpandableRowContent>
                                                 <HistoryPanel
                                                     metric={metric}
+                                                    name={alias || label}
                                                     categoryKey={category.key}
-                                                    fahrenheit={fahrenheit}
+                                                    fahrenheit={view.fahrenheit}
                                                     max={max}
                                                     crit={crit}
-                                                    status={historyStatus}
+                                                    status={view.historyStatus}
                                                     onEnable={onEnableHistory}
                                                 />
                                             </ExpandableRowContent>

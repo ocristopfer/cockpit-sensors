@@ -124,6 +124,20 @@ export const celsiusToFahrenheit = (value: number): number => (value * 9) / 5 + 
 export const toDisplayValue = (categoryKey: string, value: number, fahrenheit: boolean): number =>
     categoryKey === "temp" && fahrenheit ? celsiusToFahrenheit(value) : value;
 
+// the unit of a category's values, as displayed
+export const unitLabel = (categoryKey: string, fahrenheit: boolean): string => {
+    switch (categoryKey) {
+    case "temp": return fahrenheit ? "°F" : "°C";
+    case "fan": return "RPM";
+    case "in": return "V";
+    case "power": return "W";
+    case "curr": return "A";
+    case "energy": return "J";
+    case "humidity": return "%";
+    default: return "";
+    }
+};
+
 // format a value that is already in display units
 export const formatDisplayValue = (categoryKey: string, value: number, fahrenheit: boolean): string => {
     switch (categoryKey) {

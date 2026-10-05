@@ -9,13 +9,15 @@ import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/inde
 import { ToggleGroup, ToggleGroupItem } from "@patternfly/react-core/dist/esm/components/ToggleGroup/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { ChartLineIcon } from "@patternfly/react-icons/dist/esm/icons/chart-line-icon.js";
+import { DownloadIcon } from "@patternfly/react-icons/dist/esm/icons/download-icon.js";
 import cockpit from "cockpit";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as timeformat from "timeformat";
 
 import { historyRanges, loadHistory, LOG_INTERVAL_MS } from "./history";
 import type { HistoryRange, HistorySample, HistoryStatus } from "./history";
-import { formatDisplayValue, toDisplayValue } from "./sensors";
+import { formatDisplayValue, toDisplayValue, unitLabel } from "./sensors";
+import { historyCsv } from "./csv";
 
 const _ = cockpit.gettext;
 
@@ -191,8 +193,21 @@ const statusMessage = (status: HistoryStatus): string => {
     }
 };
 
-export const HistoryPanel = ({ metric, categoryKey, fahrenheit, max, crit, status, onEnable }: {
+// offer the history as a CSV file to save
+const downloadCsv = (fileName: string, csv: string) => {
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+};
+
+export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit, status, onEnable }: {
     metric: string;
+    name: string;
     categoryKey: string;
     fahrenheit: boolean;
     max: number | undefined;
@@ -303,17 +318,27 @@ export const HistoryPanel = ({ metric, categoryKey, fahrenheit, max, crit, statu
 
     return (
         <div className="sensors-history">
-            <ToggleGroup isCompact aria-label={_("History range")}>
-                {historyRanges.map(r => (
-                    <ToggleGroupItem
-                        key={r.id}
-                        text={rangeLabel(r)}
-                        buttonId={`history-range-${metric}-${r.id}`}
-                        isSelected={r.id === range.id}
-                        onChange={() => setRange(r)}
-                    />
-                ))}
-            </ToggleGroup>
+            <Flex justifyContent={{ default: "justifyContentSpaceBetween" }} alignItems={{ default: "alignItemsCenter" }}>
+                <ToggleGroup isCompact aria-label={_("History range")}>
+                    {historyRanges.map(r => (
+                        <ToggleGroupItem
+                            key={r.id}
+                            text={rangeLabel(r)}
+                            buttonId={`history-range-${metric}-${r.id}`}
+                            isSelected={r.id === range.id}
+                            onChange={() => setRange(r)}
+                        />
+                    ))}
+                </ToggleGroup>
+                <Button
+                    variant="link"
+                    icon={<DownloadIcon />}
+                    isDisabled={values.length === 0}
+                    onClick={() => downloadCsv(`${metric}-${range.id}.csv`, historyCsv(name, display, unitLabel(categoryKey, fahrenheit)))}
+                >
+                    {_("Export CSV")}
+                </Button>
+            </Flex>
             {body}
         </div>
     );
