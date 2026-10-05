@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sensors 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-05 00:21+0000\n"
+"POT-Creation-Date: 2026-10-05 01:10+0000\n"
 "PO-Revision-Date: 2026-04-03 00:00+0000\n"
 "Last-Translator: Cristopfer Luis <ocristopfer@gmail.com>\n"
 "Language-Team: Portuguese (Brazil)\n"
@@ -25,7 +25,7 @@ msgstr "Crítico"
 msgid "Warning"
 msgstr "Alerta"
 
-#: src/history.ts:133
+#: src/history.ts:137
 msgid "PCP is not available for $0"
 msgstr "O PCP não está disponível para $0"
 
@@ -57,55 +57,63 @@ msgstr "O PCP não está gravando os sensores."
 msgid "The python3-pcp package is missing, so the recorded history cannot be read."
 msgstr "O pacote python3-pcp está faltando, então o histórico gravado não pode ser lido."
 
-#: src/HistoryChart.tsx:258
+#: src/HistoryChart.tsx:192
+msgid "The cockpit-pcp package is missing, so Cockpit cannot read the recorded history."
+msgstr "O pacote cockpit-pcp não está instalado, então o Cockpit não consegue ler o histórico gravado."
+
+#: src/HistoryChart.tsx:244
+msgid "Cockpit cannot read PCP archives. Install the cockpit-pcp package."
+msgstr "O Cockpit não consegue ler os arquivos do PCP. Instale o pacote cockpit-pcp."
+
+#: src/HistoryChart.tsx:263
 msgid "Sensor history is not enabled"
 msgstr "O histórico dos sensores não está ativado"
 
-#: src/HistoryChart.tsx:262
+#: src/HistoryChart.tsx:267
 msgid "Enabling it installs PCP if needed and records all sensors every minute."
 msgstr "Ao ativar, o PCP é instalado se necessário e todos os sensores são gravados a cada minuto."
 
-#: src/HistoryChart.tsx:266 src/app.tsx:550
+#: src/HistoryChart.tsx:271 src/app.tsx:550
 msgid "Enable history"
 msgstr "Ativar histórico"
 
-#: src/HistoryChart.tsx:278
+#: src/HistoryChart.tsx:283
 msgid "max"
 msgstr "máx"
 
-#: src/HistoryChart.tsx:280
+#: src/HistoryChart.tsx:285
 msgid "crit"
 msgstr "crít"
 
-#: src/HistoryChart.tsx:288
+#: src/HistoryChart.tsx:293
 msgid "Could not load the sensor history"
 msgstr "Não foi possível carregar o histórico do sensor"
 
-#: src/HistoryChart.tsx:293
+#: src/HistoryChart.tsx:298
 msgid "No history yet"
 msgstr "Ainda sem histórico"
 
-#: src/HistoryChart.tsx:295
+#: src/HistoryChart.tsx:300
 msgid "Sensors are recorded every minute; the first values appear shortly."
 msgstr "Os sensores são gravados a cada minuto; os primeiros valores aparecem em breve."
 
-#: src/HistoryChart.tsx:311
+#: src/HistoryChart.tsx:316
 msgid "Minimum: $0"
 msgstr "Mínimo: $0"
 
-#: src/HistoryChart.tsx:312
+#: src/HistoryChart.tsx:317
 msgid "Average: $0"
 msgstr "Média: $0"
 
-#: src/HistoryChart.tsx:313
+#: src/HistoryChart.tsx:318
 msgid "Maximum: $0"
 msgstr "Máximo: $0"
 
-#: src/HistoryChart.tsx:322
+#: src/HistoryChart.tsx:327
 msgid "History range"
 msgstr "Período do histórico"
 
-#: src/HistoryChart.tsx:339
+#: src/HistoryChart.tsx:344
 msgid "Export CSV"
 msgstr "Exportar CSV"
 

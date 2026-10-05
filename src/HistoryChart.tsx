@@ -188,6 +188,8 @@ const statusMessage = (status: HistoryStatus): string => {
         return _("PCP is not recording the sensors.");
     case "no-python":
         return _("The python3-pcp package is missing, so the recorded history cannot be read.");
+    case "no-cockpit-pcp":
+        return _("The cockpit-pcp package is missing, so Cockpit cannot read the recorded history.");
     default:
         return "";
     }
@@ -237,7 +239,10 @@ export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit,
                     })
                     .catch((err: Error) => {
                         if (!cancelled)
-                            setError(err.message);
+                            // the metrics channel is missing when cockpit-pcp is not installed
+                            setError(err.message === "not-supported"
+                                ? _("Cockpit cannot read PCP archives. Install the cockpit-pcp package.")
+                                : err.message);
                     });
         };
 
