@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sensors 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-05 00:08+0000\n"
+"POT-Creation-Date: 2026-10-05 00:21+0000\n"
 "PO-Revision-Date: 2026-04-03 00:00+0000\n"
 "Last-Translator: Cristopfer Luis <ocristopfer@gmail.com>\n"
 "Language-Team: Portuguese (Brazil)\n"
@@ -17,11 +17,11 @@ msgstr ""
 msgid "Cockpit Sensors"
 msgstr "Sensores para Cockpit"
 
-#: src/StatusIcon.tsx:17 src/SensorTable.tsx:32 src/sensors.ts:187
+#: src/StatusIcon.tsx:17 src/SensorTable.tsx:33 src/sensors.ts:187
 msgid "Critical"
 msgstr "Crítico"
 
-#: src/StatusIcon.tsx:19 src/SensorTable.tsx:32
+#: src/StatusIcon.tsx:19 src/SensorTable.tsx:33
 msgid "Warning"
 msgstr "Alerta"
 
@@ -65,7 +65,7 @@ msgstr "O histórico dos sensores não está ativado"
 msgid "Enabling it installs PCP if needed and records all sensors every minute."
 msgstr "Ao ativar, o PCP é instalado se necessário e todos os sensores são gravados a cada minuto."
 
-#: src/HistoryChart.tsx:266 src/app.tsx:516
+#: src/HistoryChart.tsx:266 src/app.tsx:550
 msgid "Enable history"
 msgstr "Ativar histórico"
 
@@ -113,43 +113,55 @@ msgstr "Exportar CSV"
 msgid "Readings since this page was opened: lowest – highest"
 msgstr "Leituras desde que esta página foi aberta: menor – maior"
 
-#: src/SensorTable.tsx:28
+#: src/SensorTable.tsx:36
+msgid "Alerts ignored"
+msgstr "Alertas ignorados"
+
+#: src/SensorTable.tsx:42
 msgid "Normal"
 msgstr "Normal"
 
-#: src/SensorTable.tsx:43
+#: src/SensorTable.tsx:56
 msgid "Hidden"
 msgstr "Oculto"
 
-#: src/SensorTable.tsx:90
+#: src/SensorTable.tsx:103
 msgid "Show history"
 msgstr "Mostrar histórico"
 
-#: src/SensorTable.tsx:91 src/SensorTable.tsx:118
+#: src/SensorTable.tsx:104 src/SensorTable.tsx:132
 msgid "Label"
 msgstr "Rótulo"
 
-#: src/SensorTable.tsx:92 src/SensorTable.tsx:121
+#: src/SensorTable.tsx:105 src/SensorTable.tsx:135
 msgid "Status"
 msgstr "Status"
 
-#: src/SensorTable.tsx:96 src/SensorTable.tsx:138
+#: src/SensorTable.tsx:109 src/SensorTable.tsx:154
 msgid "Recent"
 msgstr "Recente"
 
-#: src/SensorTable.tsx:97
+#: src/SensorTable.tsx:110
 msgid "Actions"
 msgstr "Ações"
 
-#: src/SensorTable.tsx:145 src/app.tsx:424
+#: src/SensorTable.tsx:161 src/app.tsx:458
 msgid "Rename"
 msgstr "Renomear"
 
-#: src/SensorTable.tsx:149
+#: src/SensorTable.tsx:165
+msgid "Watch alerts"
+msgstr "Acompanhar alertas"
+
+#: src/SensorTable.tsx:165
+msgid "Ignore alerts"
+msgstr "Ignorar alertas"
+
+#: src/SensorTable.tsx:169
 msgid "Show"
 msgstr "Mostrar"
 
-#: src/SensorTable.tsx:149
+#: src/SensorTable.tsx:169
 msgid "Hide"
 msgstr "Ocultar"
 
@@ -265,323 +277,339 @@ msgstr "Limite"
 msgid "Averaging interval"
 msgstr "Intervalo da média"
 
-#: src/sensors.ts:238
-msgid "Chassis opened"
-msgstr "Gabinete aberto"
+#: src/sensors.ts:312
+msgid "Above the emergency limit ($0)"
+msgstr "Acima do limite de emergência ($0)"
 
-#: src/sensors.ts:240
-msgid "Alarm reported by the chip"
-msgstr "Alarme informado pelo chip"
+#: src/sensors.ts:313
+msgid "Above the critical limit ($0)"
+msgstr "Acima do limite crítico ($0)"
 
-#: src/sensors.ts:242
-msgid "Sensor fault"
-msgstr "Falha no sensor"
+#: src/sensors.ts:314
+msgid "Above the maximum ($0)"
+msgstr "Acima do máximo ($0)"
 
-#: src/sensors.ts:258
-msgid "Above the emergency limit"
-msgstr "Acima do limite de emergência"
+#: src/sensors.ts:315
+msgid "Below the critical limit ($0)"
+msgstr "Abaixo do limite crítico ($0)"
 
-#: src/sensors.ts:260
-msgid "Above the critical limit"
-msgstr "Acima do limite crítico"
+#: src/sensors.ts:316
+msgid "Below the minimum ($0)"
+msgstr "Abaixo do mínimo ($0)"
 
-#: src/sensors.ts:262
-msgid "Above the maximum"
-msgstr "Acima do máximo"
-
-#: src/sensors.ts:266
+#: src/sensors.ts:317
 msgid "Fan stopped"
 msgstr "Ventoinha parada"
 
-#: src/sensors.ts:268 src/sensors.ts:272
-msgid "Below the minimum"
-msgstr "Abaixo do mínimo"
+#: src/sensors.ts:318
+msgid "Critical alarm reported by the chip"
+msgstr "Alarme crítico informado pelo chip"
 
-#: src/sensors.ts:270
-msgid "Below the critical limit"
-msgstr "Abaixo do limite crítico"
+#: src/sensors.ts:319
+msgid "Alarm reported by the chip"
+msgstr "Alarme informado pelo chip"
 
-#: src/sensors.ts:292
+#: src/sensors.ts:320
+msgid "Sensor fault"
+msgstr "Falha no sensor"
+
+#: src/sensors.ts:321
+msgid "Chassis was opened"
+msgstr "O gabinete foi aberto"
+
+#: src/sensors.ts:333
 msgid "CPU (Intel)"
 msgstr "CPU (Intel)"
 
-#: src/sensors.ts:293
+#: src/sensors.ts:334
 msgid "CPU (AMD)"
 msgstr "CPU (AMD)"
 
-#: src/sensors.ts:294
+#: src/sensors.ts:335
 msgid "CPU"
 msgstr "CPU"
 
-#: src/sensors.ts:295
+#: src/sensors.ts:336
 msgid "GPU"
 msgstr "GPU"
 
-#: src/sensors.ts:296
+#: src/sensors.ts:337
 msgid "NVMe drive"
 msgstr "Unidade NVMe"
 
-#: src/sensors.ts:297
+#: src/sensors.ts:338
 msgid "Disk"
 msgstr "Disco"
 
-#: src/sensors.ts:298
+#: src/sensors.ts:339
 msgid "ACPI thermal zone"
 msgstr "Zona térmica ACPI"
 
-#: src/sensors.ts:299
+#: src/sensors.ts:340
 msgid "Motherboard"
 msgstr "Placa-mãe"
 
-#: src/sensors.ts:300
+#: src/sensors.ts:341
 msgid "Chipset"
 msgstr "Chipset"
 
-#: src/sensors.ts:301
+#: src/sensors.ts:342
 msgid "Memory"
 msgstr "Memória"
 
-#: src/sensors.ts:302
+#: src/sensors.ts:343
 msgid "Wi-Fi"
 msgstr "Wi-Fi"
 
-#: src/sensors.ts:303
+#: src/sensors.ts:344
 msgid "Network"
 msgstr "Rede"
 
-#: src/sensors.ts:304
+#: src/sensors.ts:345
 msgid "Battery"
 msgstr "Bateria"
 
-#: src/sensors.ts:305
+#: src/sensors.ts:346
 msgid "Power supply"
 msgstr "Fonte de alimentação"
 
-#: src/sensors.ts:306
+#: src/sensors.ts:347
 msgid "Dell embedded controller"
 msgstr "Controlador embarcado Dell"
 
-#: src/sensors.ts:307
+#: src/sensors.ts:348
 msgid "ThinkPad embedded controller"
 msgstr "Controlador embarcado ThinkPad"
 
-#: src/sensors.ts:308
+#: src/sensors.ts:349
 msgid "Apple SMC"
 msgstr "Apple SMC"
 
-#: src/sensors.ts:309
+#: src/sensors.ts:350
 msgid "Cooling controller"
 msgstr "Controlador de refrigeração"
 
-#: src/sensors.ts:310
+#: src/sensors.ts:351
 msgid "Raspberry Pi"
 msgstr "Raspberry Pi"
 
-#: src/Overview.tsx:47
+#: src/Overview.tsx:58
 msgid "Opened"
 msgstr "Aberto"
 
-#: src/Overview.tsx:47
+#: src/Overview.tsx:58
 msgid "Closed"
 msgstr "Fechado"
 
-#: src/Overview.tsx:49
+#: src/Overview.tsx:60
 msgid "$0 sensor"
 msgid_plural "$0 sensors"
 msgstr[0] "$0 sensor"
 msgstr[1] "$0 sensores"
 
-#: src/Overview.tsx:55
+#: src/Overview.tsx:66
 msgid "Highest: $0 ($1)"
 msgstr "Maior: $0 ($1)"
 
-#: src/Overview.tsx:60
+#: src/Overview.tsx:71
 msgid "All stopped"
 msgstr "Todas paradas"
 
-#: src/Overview.tsx:64
+#: src/Overview.tsx:75
 msgid "$0 running: $1"
 msgid_plural "$0 running: $1"
 msgstr[0] "$0 ligada: $1"
 msgstr[1] "$0 ligadas: $1"
 
-#: src/Overview.tsx:67
+#: src/Overview.tsx:78
 msgid "Total: $0"
 msgstr "Total: $0"
 
-#: src/Overview.tsx:143 src/app.tsx:438
+#: src/Overview.tsx:154 src/app.tsx:472
 msgid "No matching sensors"
 msgstr "Nenhum sensor correspondente"
 
-#: src/Overview.tsx:144
+#: src/Overview.tsx:155
 msgid "No sensor matches the filter."
 msgstr "Nenhum sensor corresponde ao filtro."
 
-#: src/Overview.tsx:161
+#: src/Overview.tsx:172
 msgid "$0 sensor, all normal"
 msgid_plural "$0 sensors, all normal"
 msgstr[0] "$0 sensor, todos normais"
 msgstr[1] "$0 sensores, todos normais"
 
-#: src/Overview.tsx:170
+#: src/Overview.tsx:181
 msgid "$0 critical"
 msgid_plural "$0 critical"
 msgstr[0] "$0 crítico"
 msgstr[1] "$0 críticos"
 
-#: src/Overview.tsx:171
+#: src/Overview.tsx:182
 msgid "$0 warning"
 msgid_plural "$0 warnings"
 msgstr[0] "$0 alerta"
 msgstr[1] "$0 alertas"
 
-#: src/app.tsx:85
+#: src/app.tsx:90
 msgid "Enable sensor history"
 msgstr "Ativar histórico dos sensores"
 
-#: src/app.tsx:89
+#: src/app.tsx:94
 msgid "Sensor history is recorded with Performance Co-Pilot (PCP), the same service that powers Cockpit's Metrics and history page."
 msgstr "O histórico dos sensores é gravado com o Performance Co-Pilot (PCP), o mesmo serviço usado pela página Métricas e histórico do Cockpit."
 
-#: src/app.tsx:92
+#: src/app.tsx:97
 msgid "PCP packages are not available for this distribution. Install PCP and its lm-sensors agent manually."
 msgstr "Os pacotes do PCP não estão disponíveis para esta distribuição. Instale o PCP e o agente lm-sensors manualmente."
 
-#: src/app.tsx:95
+#: src/app.tsx:100
 msgid "This will:"
 msgstr "Isso vai:"
 
-#: src/app.tsx:99
+#: src/app.tsx:104
 msgid "install the packages $0, if missing"
 msgstr "instalar os pacotes $0, se estiverem faltando"
 
-#: src/app.tsx:100
+#: src/app.tsx:105
 msgid "install PCP, if missing"
 msgstr "instalar o PCP, se estiver faltando"
 
-#: src/app.tsx:102
+#: src/app.tsx:107
 msgid "enable the PCP lm-sensors agent (pmdalmsensors)"
 msgstr "ativar o agente lm-sensors do PCP (pmdalmsensors)"
 
-#: src/app.tsx:103
+#: src/app.tsx:108
 msgid "record all sensor readings every minute with pmlogger"
 msgstr "gravar as leituras de todos os sensores a cada minuto com o pmlogger"
 
-#: src/app.tsx:106
+#: src/app.tsx:111
 msgid "History is kept as long as pmlogger keeps its archives (14 days by default)."
 msgstr "O histórico é mantido enquanto o pmlogger guardar seus arquivos (14 dias por padrão)."
 
-#: src/app.tsx:111
+#: src/app.tsx:116
 msgid "Enabling sensor history failed"
 msgstr "Falha ao ativar o histórico dos sensores"
 
-#: src/app.tsx:115
+#: src/app.tsx:120
 msgid "Enable"
 msgstr "Ativar"
 
-#: src/app.tsx:118 src/app.tsx:146
+#: src/app.tsx:123 src/app.tsx:151
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: src/app.tsx:135
+#: src/app.tsx:140
 msgid "Rename $0"
 msgstr "Renomear $0"
 
-#: src/app.tsx:138
+#: src/app.tsx:143
 msgid "Name"
 msgstr "Nome"
 
-#: src/app.tsx:141
+#: src/app.tsx:146
 msgid "Leave empty to use the original name. Names are remembered in this browser."
 msgstr "Deixe vazio para usar o nome original. Os nomes ficam salvos neste navegador."
 
-#: src/app.tsx:145
+#: src/app.tsx:150
 msgid "Save"
 msgstr "Salvar"
 
-#: src/app.tsx:241
+#: src/app.tsx:252
 msgid "lm-sensors not found, do you want to install it?"
 msgstr "lm-sensors não encontrado, deseja instalá-lo?"
 
-#: src/app.tsx:272
+#: src/app.tsx:283
 msgid "Unable to detect OS: $0"
 msgstr "Não foi possível detectar o sistema operacional: $0"
 
-#: src/app.tsx:297
+#: src/app.tsx:308
 msgid "Unsupported OS: $0"
 msgstr "Sistema operacional não suportado: $0"
 
-#: src/app.tsx:327
+#: src/app.tsx:338
 msgid "Detecting sensors failed: $0"
 msgstr "A detecção de sensores falhou: $0"
 
+#: src/app.tsx:419
+msgid "$0 sensor is critical"
+msgid_plural "$0 sensors are critical"
+msgstr[0] "$0 sensor está crítico"
+msgstr[1] "$0 sensores estão críticos"
+
 #: src/app.tsx:420
+msgid "$0 sensor needs attention"
+msgid_plural "$0 sensors need attention"
+msgstr[0] "$0 sensor precisa de atenção"
+msgstr[1] "$0 sensores precisam de atenção"
+
+#: src/app.tsx:454
 msgid "Adapter: $0"
 msgstr "Adaptador: $0"
 
-#: src/app.tsx:420
+#: src/app.tsx:454
 msgid "unknown"
 msgstr "desconhecido"
 
-#: src/app.tsx:432
+#: src/app.tsx:466
 msgid "Show this chip"
 msgstr "Mostrar este chip"
 
-#: src/app.tsx:432
+#: src/app.tsx:466
 msgid "Hide this chip"
 msgstr "Ocultar este chip"
 
-#: src/app.tsx:440
+#: src/app.tsx:474
 msgid "No sensor of this chip matches the filter."
 msgstr "Nenhum sensor deste chip corresponde ao filtro."
 
-#: src/app.tsx:440
+#: src/app.tsx:474
 msgid "All sensors of this chip are hidden."
 msgstr "Todos os sensores deste chip estão ocultos."
 
-#: src/app.tsx:462
+#: src/app.tsx:496
 msgid "No sensors found"
 msgstr "Nenhum sensor encontrado"
 
-#: src/app.tsx:464
+#: src/app.tsx:498
 msgid "lm-sensors does not report any sensor. Detecting sensors probes your hardware and loads the kernel drivers it needs (administrator access required)."
 msgstr "O lm-sensors não informa nenhum sensor. A detecção de sensores examina o hardware e carrega os drivers do kernel necessários (requer acesso de administrador)."
 
-#: src/app.tsx:469
+#: src/app.tsx:503
 msgid "Detect sensors"
 msgstr "Detectar sensores"
 
-#: src/app.tsx:479
+#: src/app.tsx:513
 msgid "Overview"
 msgstr "Visão geral"
 
-#: src/app.tsx:504 src/manifest.json:0 org.cockpit_project.sensors.metainfo.xml:5
+#: src/app.tsx:538 src/manifest.json:0 org.cockpit_project.sensors.metainfo.xml:5
 msgid "Sensors"
 msgstr "Sensores"
 
-#: src/app.tsx:512
+#: src/app.tsx:546
 msgid "Install lm-sensors"
 msgstr "Instalar lm-sensors"
 
-#: src/app.tsx:525
+#: src/app.tsx:559
 msgid "Filter sensors"
 msgstr "Filtrar sensores"
 
-#: src/app.tsx:532
+#: src/app.tsx:566
 msgid "Temperature unit"
 msgstr "Unidade de temperatura"
 
-#: src/app.tsx:550
+#: src/app.tsx:584
 msgid "Refresh interval"
 msgstr "Intervalo de atualização"
 
-#: src/app.tsx:558
+#: src/app.tsx:592
 msgid "Refresh every $0 second"
 msgid_plural "Refresh every $0 seconds"
 msgstr[0] "Atualizar a cada $0 segundo"
 msgstr[1] "Atualizar a cada $0 segundos"
 
-#: src/app.tsx:568
+#: src/app.tsx:602
 msgid "Show hidden ($0)"
 msgstr "Mostrar ocultos ($0)"
 

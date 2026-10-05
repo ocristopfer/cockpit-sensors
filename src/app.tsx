@@ -32,14 +32,17 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { enableHistory, getHistoryStatus, pcpPackages } from "./history";
 import type { HistoryStatus } from "./history";
+import { page_status } from "notifications";
+
 import { Overview } from "./Overview";
 import { usePreference } from "./preferences";
 import { SensorName, SensorTable } from "./SensorTable";
-import { chipDisplayNames, extractSensorGroup, parseSensorsRaw, readOsIds, sensorCategories, sensorStatus, worstLevel } from "./sensors";
+import { chipDisplayNames, extractSensorGroup, parseSensorsRaw, readOsIds, sensorCategories, worstLevel } from "./sensors";
 import type { SensorData } from "./sensors";
 import { StatusIcon } from "./StatusIcon";
+import { StatusTracker } from "./status";
 import { sensorKey, TrendRecorder } from "./trend";
-import { isVisible, matchesFilter, SensorViewContext } from "./view";
+import { alertLevel, isVisible, matchesFilter, SensorViewContext } from "./view";
 import type { SensorView } from "./view";
 
 const _ = cockpit.gettext;
@@ -53,6 +56,8 @@ type AlertInfo = {
 
 const OVERVIEW_TAB = "overview";
 const refreshIntervals = [1, 2, 5, 10];
+// while the page is in the background, keep reading the sensors this often (ms) for the alert in Cockpit's menu
+const BACKGROUND_INTERVAL = 30 * 1000;
 
 const EnableHistoryModal = ({ onClose, onEnabled }: { onClose: () => void; onEnabled: () => void }) => {
     const [packages, setPackages] = useState<string[] | null | undefined>(undefined);
@@ -177,11 +182,13 @@ const Application = () => {
     const [sensorData, setSensorData] = useState<SensorData>({});
     const [loaded, setLoaded] = useState<boolean>(false);
     const [trends] = useState(() => new TrendRecorder());
+    const [statuses] = useState(() => new StatusTracker());
 
     const [fahrenheit, setFahrenheit] = usePreference<boolean>("fahrenheitChecked", false);
     const [refreshInterval, setRefreshInterval] = usePreference<number>("refreshInterval", 1);
     const [hiddenList, setHiddenList] = usePreference<string[]>("hiddenSensors", []);
     const [aliases, setAliases] = usePreference<Record<string, string>>("sensorAliases", {});
+    const [mutedList, setMutedList] = usePreference<string[]>("mutedSensors", []);
     const [showHidden, setShowHidden] = useState<boolean>(false);
     const [filter, setFilter] = useState<string>("");
     const [renaming, setRenaming] = useState<{ key: string; name: string } | null>(null);
@@ -196,6 +203,8 @@ const Application = () => {
     const reading = useRef<boolean>(false);
     // the last error shown for reading the sensors, to show each one only once
     const lastError = useRef<string | null>(null);
+    // when the sensors were last read
+    const lastRead = useRef<number>(0);
 
     const showPollingError = (msg: string) => {
         if (lastError.current === msg)
@@ -210,6 +219,8 @@ const Application = () => {
             setAlert(prev => prev?.fromPolling ? null : prev);
         }
         trends.record(data);
+        statuses.update(data);
+        lastRead.current = Date.now();
         setSensorData(data);
         setLoaded(true);
     };
@@ -341,13 +352,13 @@ const Application = () => {
         });
     };
 
-    // read the sensors periodically, but not while the page is in the background
+    // read the sensors periodically; rarely while the page is in the background
     useEffect(() => {
         if (!installed || loading)
             return;
 
         const tick = () => {
-            if (!cockpit.hidden)
+            if (!cockpit.hidden || Date.now() - lastRead.current >= BACKGROUND_INTERVAL)
                 loadSensors();
         };
         tick();
@@ -369,7 +380,9 @@ const Application = () => {
         hidden,
         showHidden,
         aliases,
+        muted: new Set(mutedList),
         trends,
+        statuses,
         historyStatus,
         expanded,
         onToggleExpanded: toggleExpanded,
@@ -381,10 +394,32 @@ const Application = () => {
                 setShowHidden(false);
         },
         onRename: (key, name) => setRenaming({ key, name }),
+        onSetMuted: (key, mute) => setMutedList(mute ? [...mutedList, key] : mutedList.filter(k => k !== key)),
     };
 
     const chipNames = chipDisplayNames(Object.keys(sensorData));
     const visibleChips = Object.entries(sensorData).filter(([chipName]) => isVisible(view, chipName));
+
+    // sensors in trouble, for the icon next to "Sensors" in Cockpit's menu
+    const alertLevels = Object.entries(sensorData).flatMap(([chipName, chipData]) =>
+        sensorCategories.flatMap(category =>
+            Object.entries(extractSensorGroup(chipData, category.key))
+                    .map(([label, values]) => alertLevel(view, chipName, label, category.key, values))));
+    const criticalCount = alertLevels.filter(level => level === "critical").length;
+    const warningCount = alertLevels.filter(level => level === "warning").length;
+
+    useEffect(() => {
+        if (criticalCount + warningCount === 0) {
+            page_status.set_own(null);
+            return;
+        }
+        page_status.set_own({
+            type: criticalCount ? "error" : "warning",
+            title: criticalCount
+                ? cockpit.format(cockpit.ngettext("$0 sensor is critical", "$0 sensors are critical", criticalCount), criticalCount)
+                : cockpit.format(cockpit.ngettext("$0 sensor needs attention", "$0 sensors need attention", warningCount), warningCount),
+        });
+    }, [criticalCount, warningCount]);
     const activeTab = visibleChips.some(([chipName]) => chipName === activeTabKey) ? activeTabKey : OVERVIEW_TAB;
 
     const chipTab = (chipName: string, chipData: SensorData[string]) => {
@@ -392,8 +427,7 @@ const Application = () => {
         const chipHidden = hidden.has(chipName);
         const levels = sensorCategories.flatMap(category =>
             Object.entries(extractSensorGroup(chipData, category.key))
-                    .filter(([label]) => !hidden.has(sensorKey(chipName, label)))
-                    .map(([, values]) => sensorStatus(category.key, values).level));
+                    .map(([label, values]) => alertLevel(view, chipName, label, category.key, values)));
         const tables = sensorCategories.filter(category =>
             Object.entries(extractSensorGroup(chipData, category.key)).some(([label]) => {
                 const key = sensorKey(chipName, label);

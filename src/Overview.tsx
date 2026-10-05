@@ -12,7 +12,7 @@ import { SearchIcon } from "@patternfly/react-icons/dist/esm/icons/search-icon.j
 import cockpit from "cockpit";
 import React from "react";
 
-import { extractSensorGroup, formatDisplayValue, getReading, sensorCategories, sensorStatus, toDisplayValue, worstLevel } from "./sensors";
+import { extractSensorGroup, formatDisplayValue, formatReasons, getReading, sensorCategories, toDisplayValue, worstLevel } from "./sensors";
 import type { SensorCategory, SensorChipGroup, SensorData, SensorStatus } from "./sensors";
 import { StatusIcon } from "./StatusIcon";
 import { sensorKey } from "./trend";
@@ -21,7 +21,14 @@ import type { SensorView } from "./view";
 
 const _ = cockpit.gettext;
 
-type SensorEntry = { name: string; category: SensorCategory; reading: number | undefined; status: SensorStatus };
+type SensorEntry = {
+    name: string;
+    category: SensorCategory;
+    reading: number | undefined;
+    status: SensorStatus;
+    // whether the sensor's alerts count, i.e. they are not ignored
+    alerting: boolean;
+};
 
 // the visible sensors of a chip that match the filter
 const chipSensors = (view: SensorView, chipName: string, chip: SensorChipGroup): SensorEntry[] =>
@@ -31,12 +38,16 @@ const chipSensors = (view: SensorView, chipName: string, chip: SensorChipGroup):
                     const key = sensorKey(chipName, label);
                     return isVisible(view, key) && matchesFilter(view, label, view.aliases[key]);
                 })
-                .map(([label, values]) => ({
-                    name: view.aliases[sensorKey(chipName, label)] || label,
-                    category,
-                    reading: getReading(values),
-                    status: sensorStatus(category.key, values),
-                })));
+                .map(([label, values]) => {
+                    const key = sensorKey(chipName, label);
+                    return {
+                        name: view.aliases[key] || label,
+                        category,
+                        reading: getReading(values),
+                        status: view.statuses.get(chipName, label, category.key, values),
+                        alerting: !view.muted.has(key),
+                    };
+                }));
 
 // one line describing all sensors of a category of a chip
 const categorySummary = (view: SensorView, category: SensorCategory, sensors: SensorEntry[]): string => {
@@ -44,7 +55,7 @@ const categorySummary = (view: SensorView, category: SensorCategory, sensors: Se
     const withReading = sensors.filter((s): s is SensorEntry & { reading: number } => typeof s.reading === "number");
 
     if (category.key === "intrusion")
-        return sensors.some(s => s.status.level !== "ok") ? _("Opened") : _("Closed");
+        return sensors.some(s => s.status.reasons.some(r => r.kind === "intrusion")) ? _("Opened") : _("Closed");
     if (withReading.length === 0)
         return cockpit.format(cockpit.ngettext("$0 sensor", "$0 sensors", sensors.length), sensors.length);
     if (withReading.length === 1)
@@ -77,7 +88,7 @@ const ChipCard = ({ chipName, displayName, sensors, onSelect }: {
     onSelect: () => void;
 }) => {
     const view = useSensorView();
-    const problems = sensors.filter(s => s.status.level !== "ok");
+    const problems = sensors.filter(s => s.alerting && s.status.level !== "ok");
     const level = worstLevel(problems.map(s => s.status.level));
     const titleId = `overview-${chipName}`;
 
@@ -118,7 +129,7 @@ const ChipCard = ({ chipName, displayName, sensors, onSelect }: {
                             <li key={`${s.category.key}-${s.name}`}>
                                 <StatusIcon level={s.status.level} />
                                 {" "}
-                                {`${s.name}: ${s.status.reasons.join(", ")}`}
+                                {`${s.name}: ${formatReasons(s.category.key, s.status, view.fahrenheit)}`}
                             </li>
                         ))}
                     </ul>}
@@ -147,8 +158,8 @@ export const Overview = ({ sensorData, chipNames, onSelect }: {
     }
 
     const all = chips.flatMap(c => c.sensors);
-    const critical = all.filter(s => s.status.level === "critical").length;
-    const warning = all.filter(s => s.status.level === "warning").length;
+    const critical = all.filter(s => s.alerting && s.status.level === "critical").length;
+    const warning = all.filter(s => s.alerting && s.status.level === "warning").length;
 
     return (
         <>

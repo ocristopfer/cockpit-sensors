@@ -3,10 +3,11 @@
 import { historyCsv } from "../../src/csv";
 import { hasHistory, pcpMetricName, pcpPackages } from "../../src/history";
 import {
-    chipDisplayName, chipDisplayNames, extractSensorGroup, formatSensorValue, getOsIds, getReading,
+    chipDisplayName, chipDisplayNames, extractSensorGroup, formatReasons, formatSensorValue, getOsIds, getReading,
     parseSensorsRaw, sensorStatus, worstLevel
 } from "../../src/sensors";
 import type { SensorChipGroup } from "../../src/sensors";
+import { StatusTracker } from "../../src/status";
 import { TREND_SAMPLES, TrendRecorder } from "../../src/trend";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -87,6 +88,7 @@ QUnit.module("sensors", () => {
         assert.equal(level("temp", { temp1_input: 106, temp1_crit: 110, temp1_emergency: 105 }), "critical");
         assert.equal(level("temp", { temp1_input: 50, temp1_max: 0 }), "ok", "a limit of 0 is not set");
         assert.equal(level("temp", { temp1_input: 40, temp1_crit_alarm: 1 }), "critical");
+        assert.equal(level("temp", { temp1_input: 40, temp1_alarm: 1 }), "warning", "plain alarms are warnings");
         assert.equal(level("temp", { temp1_input: 40, temp1_fault: 1 }), "warning");
 
         assert.equal(level("fan", { fan1_input: 1000, fan1_min: 300 }), "ok");
@@ -97,12 +99,48 @@ QUnit.module("sensors", () => {
         assert.equal(level("in", { in1_input: 1.0, in1_min: 1.1, in1_max: 1.3 }), "warning");
         assert.equal(level("in", { in1_input: 1.2, in1_min: 1.1, in1_max: 1.3 }), "ok");
         assert.equal(level("in", { in1_input: 1.0, in1_min: 1.1, in1_max: 0.5 }), "ok", "limits with min > max are ignored");
+        assert.equal(level("in", { in0_input: 4.9, in0_min: 5.0, in0_max: 5.0 }), "ok", "limits with min == max are ignored");
         assert.equal(level("in", { in1_input: 0.5, in1_lcrit: 0.6 }), "critical");
+        assert.equal(level("in", { in7_input: 0, in7_alarm: 1 }), "warning", "alarm of an unconnected input");
 
-        assert.equal(level("intrusion", { intrusion0_alarm: 1 }), "critical");
-        assert.deepEqual(sensorStatus("intrusion", { intrusion0_alarm: 1 }).reasons, ["Chassis opened"]);
+        assert.equal(level("intrusion", { intrusion0_alarm: 1 }), "warning", "often latched on boards without a switch");
         assert.equal(level("intrusion", { intrusion0_alarm: 0 }), "ok");
+    });
 
+    QUnit.test("sensorStatus reasons", assert => {
+        const reasons = (category: string, values: Record<string, number>, fahrenheit = false) =>
+            formatReasons(category, sensorStatus(category, values), fahrenheit);
+
+        assert.equal(reasons("temp", { temp1_input: 85, temp1_max: 80, temp1_alarm: 1 }), "Above the maximum (80.0 °C)",
+                     "an alarm explained by a limit adds nothing");
+        assert.equal(reasons("temp", { temp1_input: 85, temp1_max: 80 }, true), "Above the maximum (176.0 °F)");
+        assert.equal(reasons("temp", { temp1_input: 101, temp1_crit: 100, temp1_crit_alarm: 1 }), "Above the critical limit (100.0 °C)");
+        assert.equal(reasons("temp", { temp1_input: 50, temp1_crit_alarm: 1 }), "Critical alarm reported by the chip");
+        assert.equal(reasons("fan", { fan2_input: 0, fan2_min: 300, fan2_alarm: 1 }), "Fan stopped");
+        assert.equal(reasons("fan", { fan1_input: 200, fan1_min: 300 }), "Below the minimum (300 RPM)");
+        assert.equal(reasons("in", { in1_input: 1.0, in1_min: 1.1 }), "Below the minimum (1.10 V)");
+        assert.equal(reasons("intrusion", { intrusion0_alarm: 1 }), "Chassis was opened");
+        assert.equal(reasons("in", { in7_input: 0, in7_alarm: 1 }), "Alarm reported by the chip");
+    });
+
+    QUnit.test("sensorStatus hysteresis", assert => {
+        const values = (input: number) => ({ temp1_input: input, temp1_max: 80, temp1_max_hyst: 75 });
+        const above = sensorStatus("temp", values(81));
+        assert.equal(above.level, "warning");
+        assert.equal(sensorStatus("temp", values(78), above).level, "warning", "stays above max until below max_hyst");
+        assert.equal(sensorStatus("temp", values(74), above).level, "ok");
+        assert.equal(sensorStatus("temp", values(78)).level, "ok", "no hysteresis when it was fine before");
+        assert.equal(sensorStatus("temp", { temp1_input: 78, temp1_max: 80 }, above).level, "ok", "no hysteresis without max_hyst");
+
+        const statuses = new StatusTracker();
+        statuses.update({ chip: { CPU: values(81) } });
+        statuses.update({ chip: { CPU: values(78) } });
+        assert.equal(statuses.get("chip", "CPU", "temp", values(78)).level, "warning", "StatusTracker keeps the previous status");
+        statuses.update({ chip: { CPU: values(70) } });
+        assert.equal(statuses.get("chip", "CPU", "temp", values(70)).level, "ok");
+    });
+
+    QUnit.test("worstLevel", assert => {
         assert.equal(worstLevel(["ok", "critical", "warning"]), "critical");
         assert.equal(worstLevel([]), "ok");
     });

@@ -58,14 +58,31 @@ class TestApplication(testlib.MachineCase):
         # overview: one card per chip, named after its driver, and the sensors in trouble
         b.wait_in_text(".sensors-overview-summary", "1 critical, 1 warning")
         b.wait_in_text(".sensors-overview-card:contains('CPU (Intel)')", "Highest: 85.0 °C (Core 1)")
-        b.wait_in_text(".sensors-overview-card:contains('Motherboard')",
-                       "fan2: Alarm reported by the chip, Fan stopped")
+        b.wait_in_text(".sensors-overview-card:contains('Motherboard')", "fan2: Fan stopped")
+        b.wait_in_text(".sensors-overview-card:contains('CPU (Intel)')", "Core 1: Above the maximum (80.0 °C)")
         b.wait_in_text(".sensors-overview-card:contains('GPU')", "PPT: 18.00 W")
+
+        # Cockpit's menu shows that a sensor is critical
+        b.switch_to_top()
+        b.wait_visible("a[href='/sensors'] .nav-item-status")
+        b.enter_page("/sensors")
 
         # chip tab: status of every sensor
         b.click(".pf-v6-c-tabs__link:contains('Motherboard')")
         b.wait_in_text("tr:contains('fan2')", "Critical")
         b.wait_in_text("tr:contains('fan1')", "Normal")
+
+        # ignoring the alerts of a sensor removes it from the summary and the tab icon
+        b.click("tr:contains('fan2') .pf-v6-c-menu-toggle")
+        b.click("button:contains('Ignore alerts')")
+        b.wait_in_text("tr:contains('fan2')", "Alerts ignored")
+        b.click(".pf-v6-c-tabs__link:contains('Overview')")
+        b.wait_in_text(".sensors-overview-summary", "1 warning")
+        b.wait_not_in_text(".sensors-overview-summary", "critical")
+        b.click(".pf-v6-c-tabs__link:contains('Motherboard')")
+        b.click("tr:contains('fan2') .pf-v6-c-menu-toggle")
+        b.click("button:contains('Watch alerts')")
+        b.wait_in_text("tr:contains('fan2')", "Critical")
         b.wait_in_text("tr:contains('SYSTIN')", "34.0 °C")
 
         # Fahrenheit

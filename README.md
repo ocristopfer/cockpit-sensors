@@ -11,9 +11,9 @@ reported by [lm-sensors](https://github.com/lm-sensors/lm-sensors): temperatures
   and the sensors that need attention
 - One tab per sensor chip, named after its driver (CPU, GPU, NVMe drive, Motherboard, ...),
   grouped into temperatures, fans, voltages, power, currents, energy, humidity and chassis intrusion
-- A **status** for every sensor (Normal, Warning, Critical) from the alarm and fault flags of the chip
-  and its `min`, `max`, `crit`, `lcrit` and `emergency` limits: overheating, stopped fans,
-  low voltages, opened chassis, ...; tabs with a sensor in trouble get a warning icon
+- **Alerts**: a status for every sensor (Normal, Warning, Critical) from its limits and the alarm flags of
+  the chip, with the reason and the exceeded limit; tabs and Cockpit's menu show when a sensor is in
+  trouble, and alerts of a sensor can be ignored (see [Alerts](#alerts))
 - Live readings with a sparkline of the last readings and the lowest/highest value since the page
   was opened; refresh every 1, 2, 5 or 10 seconds, paused while the page is not visible
 - Filter sensors by name; rename or hide sensors and whole chips (remembered in the browser)
@@ -80,6 +80,32 @@ rm -r cockpit-sensors cockpit-sensors.tar.xz
 ```
 
 Then reload Cockpit and open **Sensors** in the menu.
+
+# Alerts
+
+![Overview](docs/overview.png)
+
+Every sensor gets a status, shown in its row (hover it for the reason), on its chip's tab, on the
+Overview and next to **Sensors** in Cockpit's menu, also while you are on another Cockpit page:
+
+| Status | When |
+|---|---|
+| **Critical** | the reading reached the `crit`, `lcrit` or `emergency` limit, a fan with a `min` limit stopped, or the chip raised a critical alarm |
+| **Warning** | the reading is above `max` or below `min`, the chip raised another alarm or reports a sensor fault, or the chassis was opened |
+| **Normal** | none of the above |
+
+- Limits of `0`, and `min`/`max` pairs where `min` is not below `max` (unused inputs, USB-C sources),
+  mean "not set" and are ignored.
+- A sensor that went above `max` or `crit` stays in that state until its reading drops below the chip's
+  hysteresis (`max_hyst`, `crit_hyst`), so it does not flap around the limit.
+- Plain alarm flags only raise a warning: many chips set them for unconnected inputs, and the chassis
+  intrusion alarm is often set on boards without an intrusion switch.
+- For a false alarm, choose **Ignore alerts** in the sensor's menu: it keeps showing its readings but no
+  longer counts in the Overview, the tab icons and Cockpit's menu. **Hide** removes it from view entirely.
+  Both are remembered in the browser.
+- While the Sensors page is open in the background, sensors are read every 30 seconds to keep Cockpit's
+  menu up to date; once you leave Cockpit, nothing is monitored. For notifications while nobody is
+  logged in, record the sensors with [PCP](#sensor-history) and use PCP's `pmie`.
 
 # Sensor history
 

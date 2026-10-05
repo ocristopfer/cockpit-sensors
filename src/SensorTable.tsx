@@ -14,7 +14,7 @@ import { HistoryPanel } from "./HistoryChart";
 import { hasHistory, pcpMetricName } from "./history";
 import {
     extractSensorGroup, formatDisplayValue, formatSensorKey, formatSensorValue, getSubFeature, isFlagKey,
-    sensorStatus, subFeatureLabel, toDisplayValue
+    formatReasons, subFeatureLabel, toDisplayValue
 } from "./sensors";
 import type { SensorCategory, SensorChipGroup, SensorStatus } from "./sensors";
 import { Sparkline } from "./Sparkline";
@@ -23,16 +23,29 @@ import { isVisible, matchesFilter, useSensorView } from "./view";
 
 const _ = cockpit.gettext;
 
-export const StatusLabel = ({ status }: { status: SensorStatus }) => {
+export const StatusLabel = ({ status, categoryKey, fahrenheit, muted }: {
+    status: SensorStatus;
+    categoryKey: string;
+    fahrenheit: boolean;
+    muted: boolean;
+}) => {
+    const reasons = formatReasons(categoryKey, status, fahrenheit);
+    const levelText = status.level === "critical" ? _("Critical") : _("Warning");
+
+    if (muted) {
+        const label = <Label isCompact variant="outline">{_("Alerts ignored")}</Label>;
+        return status.level === "ok"
+            ? label
+            : <Tooltip content={`${levelText}: ${reasons}`}>{label}</Tooltip>;
+    }
     if (status.level === "ok")
         return <Label isCompact variant="outline" status="success">{_("Normal")}</Label>;
 
-    const label = (
-        <Label isCompact status={status.level === "critical" ? "danger" : "warning"}>
-            {status.level === "critical" ? _("Critical") : _("Warning")}
-        </Label>
+    return (
+        <Tooltip content={reasons}>
+            <Label isCompact status={status.level === "critical" ? "danger" : "warning"}>{levelText}</Label>
+        </Tooltip>
     );
-    return <Tooltip content={status.reasons.join(", ")}>{label}</Tooltip>;
 };
 
 // a sensor or chip label, with its original name when the user renamed it
@@ -106,7 +119,8 @@ export const SensorTable = ({ chipName, chipData, category }: {
                         const isExpanded = withHistory && view.expanded.has(metric);
                         const max = getSubFeature(values, "max");
                         const crit = getSubFeature(values, "crit");
-                        const status = sensorStatus(category.key, values);
+                        const status = view.statuses.get(chipName, label, category.key, values);
+                        const muted = view.muted.has(key);
                         const trend = view.trends.get(key);
 
                         return (
@@ -118,10 +132,12 @@ export const SensorTable = ({ chipName, chipData, category }: {
                                     <Td dataLabel={_("Label")}>
                                         <SensorName name={label} alias={alias} hidden={hidden} />
                                     </Td>
-                                    <Td dataLabel={_("Status")}><StatusLabel status={status} /></Td>
+                                    <Td dataLabel={_("Status")}>
+                                        <StatusLabel status={status} categoryKey={category.key} fahrenheit={view.fahrenheit} muted={muted} />
+                                    </Td>
                                     {columns.map((column) => {
                                         const value = getSubFeature(values, column);
-                                        const highlight = (column === "input" || column === "average") && status.level !== "ok";
+                                        const highlight = (column === "input" || column === "average") && status.level !== "ok" && !muted;
                                         return (
                                             <Td
                                                 key={column}
@@ -144,6 +160,10 @@ export const SensorTable = ({ chipName, chipData, category }: {
                                                 {
                                                     title: _("Rename"),
                                                     onClick: () => view.onRename(key, label),
+                                                },
+                                                {
+                                                    title: muted ? _("Watch alerts") : _("Ignore alerts"),
+                                                    onClick: () => view.onSetMuted(key, !muted),
                                                 },
                                                 {
                                                     title: hidden ? _("Show") : _("Hide"),

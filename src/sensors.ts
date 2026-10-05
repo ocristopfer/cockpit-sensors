@@ -207,7 +207,15 @@ export const getReading = (values: SensorValueGroup): number | undefined =>
     getSubFeature(values, "input") ?? getSubFeature(values, "average");
 
 export type SensorStatusLevel = "ok" | "warning" | "critical";
-export type SensorStatus = { level: SensorStatusLevel; reasons: string[] };
+
+export type StatusReasonKind =
+    | "emergency" | "crit" | "max" | "lcrit" | "min" | "stopped" // reading beyond a limit
+    | "crit_alarm" | "alarm" | "fault" | "intrusion"; // flags set by the chip
+
+// why a sensor is not ok; limit is the exceeded limit, in the sensor's raw unit
+export type StatusReason = { kind: StatusReasonKind; limit?: number };
+
+export type SensorStatus = { level: SensorStatusLevel; reasons: StatusReason[] };
 
 const levelOrder: Record<SensorStatusLevel, number> = { ok: 0, warning: 1, critical: 2 };
 
@@ -220,69 +228,102 @@ const isLimit = (value: number | undefined): value is number => typeof value ===
 /*
  * Whether a sensor is fine, judged by the alarm and fault flags that the chip
  * reports and by comparing its reading with its limits.
+ *
+ * Only critical limits (crit, lcrit, emergency, a stopped fan) make a sensor
+ * critical. Plain alarm flags mean "outside min/max" for most chips, and are
+ * often set for unconnected inputs, so they only raise a warning.
+ *
+ * With the previous status of the sensor, a sensor that went above max or
+ * crit stays there until its reading drops below the chip's hysteresis
+ * (max_hyst, crit_hyst), so that it does not flap around the limit.
  */
-export const sensorStatus = (categoryKey: string, values: SensorValueGroup): SensorStatus => {
-    const reasons: string[] = [];
+export const sensorStatus = (categoryKey: string, values: SensorValueGroup, previous?: SensorStatus): SensorStatus => {
+    const reasons: StatusReason[] = [];
     let level: SensorStatusLevel = "ok";
-    const raise = (newLevel: SensorStatusLevel, reason: string) => {
-        if (!reasons.includes(reason))
-            reasons.push(reason);
+    const raise = (newLevel: SensorStatusLevel, kind: StatusReasonKind, limit?: number) => {
+        if (!reasons.some(r => r.kind === kind))
+            reasons.push(limit === undefined ? { kind } : { kind, limit });
         level = worstLevel([level, newLevel]);
     };
+
+    const reading = getReading(values);
+    if (typeof reading === "number") {
+        const min = getSubFeature(values, "min");
+        const max = getSubFeature(values, "max");
+        const crit = getSubFeature(values, "crit");
+        const lcrit = getSubFeature(values, "lcrit");
+        const emergency = getSubFeature(values, "emergency");
+        // some chips report min > max for unused inputs, and USB-C sources min == max (the negotiated
+        // voltage); such limits are no range to check against
+        const limitsValid = !(isLimit(min) && isLimit(max) && min >= max);
+
+        // whether the reading is above a limit, or still above its hysteresis after having been above it
+        const above = (kind: StatusReasonKind, limit: number, hystKey: string): boolean => {
+            if (reading > limit || (kind !== "max" && reading >= limit))
+                return true;
+            const hyst = getSubFeature(values, hystKey);
+            return !!previous?.reasons.some(r => r.kind === kind) && isLimit(hyst) && hyst < limit && reading > hyst;
+        };
+
+        if (isLimit(emergency) && above("emergency", emergency, "emergency_hyst"))
+            raise("critical", "emergency", emergency);
+        else if (isLimit(crit) && above("crit", crit, "crit_hyst"))
+            raise("critical", "crit", crit);
+        else if (limitsValid && isLimit(max) && above("max", max, "max_hyst"))
+            raise("warning", "max", max);
+
+        if (categoryKey === "fan") {
+            if (isLimit(min) && reading === 0)
+                raise("critical", "stopped");
+            else if (isLimit(min) && reading < min)
+                raise("warning", "min", min);
+        } else if (isLimit(lcrit) && reading <= lcrit) {
+            raise("critical", "lcrit", lcrit);
+        } else if (limitsValid && isLimit(min) && reading < min) {
+            raise("warning", "min", min);
+        }
+    }
 
     for (const [key, value] of Object.entries(values)) {
         const stripped = formatSensorKey(key);
         if (value !== 1)
             continue;
-        if (categoryKey === "intrusion" && stripped.endsWith("alarm"))
-            raise("critical", _("Chassis opened"));
-        else if (stripped.endsWith("alarm"))
-            raise("critical", _("Alarm reported by the chip"));
-        else if (stripped.endsWith("fault"))
-            raise("warning", _("Sensor fault"));
-    }
-
-    const reading = getReading(values);
-    if (typeof reading !== "number")
-        return { level, reasons };
-
-    const min = getSubFeature(values, "min");
-    const max = getSubFeature(values, "max");
-    const crit = getSubFeature(values, "crit");
-    const lcrit = getSubFeature(values, "lcrit");
-    const emergency = getSubFeature(values, "emergency");
-    // some chips report min > max for unused inputs; such limits mean nothing
-    const limitsValid = !(isLimit(min) && isLimit(max) && min > max);
-
-    if (isLimit(emergency) && reading >= emergency)
-        raise("critical", _("Above the emergency limit"));
-    else if (isLimit(crit) && reading >= crit)
-        raise("critical", _("Above the critical limit"));
-    else if (limitsValid && isLimit(max) && reading > max)
-        raise("warning", _("Above the maximum"));
-
-    if (categoryKey === "fan") {
-        if (isLimit(min) && reading === 0)
-            raise("critical", _("Fan stopped"));
-        else if (isLimit(min) && reading < min)
-            raise("warning", _("Below the minimum"));
-    } else if (isLimit(lcrit) && reading <= lcrit) {
-        raise("critical", _("Below the critical limit"));
-    } else if (limitsValid && isLimit(min) && reading < min) {
-        raise("warning", _("Below the minimum"));
+        // alarms already explained by a limit (e.g. "Above the maximum (80.0 °C)") add nothing
+        if (categoryKey === "intrusion" && stripped.endsWith("alarm")) {
+            raise("warning", "intrusion");
+        } else if (/^(crit|lcrit|emergency)_alarm$/.test(stripped)) {
+            if (!reasons.some(r => r.kind === "emergency" || r.kind === "crit" || r.kind === "lcrit"))
+                raise("critical", "crit_alarm");
+        } else if (stripped.endsWith("alarm")) {
+            if (reasons.length === 0)
+                raise("warning", "alarm");
+        } else if (stripped.endsWith("fault")) {
+            raise("warning", "fault");
+        }
     }
 
     return { level, reasons };
 };
 
-// the status of every sensor of a chip, keyed by sensor label
-export const chipStatuses = (chip: SensorChipGroup): { label: string; category: SensorCategory; status: SensorStatus }[] =>
-    sensorCategories.flatMap(category =>
-        Object.entries(extractSensorGroup(chip, category.key)).map(([label, values]) => ({
-            label,
-            category,
-            status: sensorStatus(category.key, values),
-        })));
+// a reason as text, e.g. "Above the maximum (80.0 °C)"
+export const formatReason = (categoryKey: string, reason: StatusReason, fahrenheit: boolean): string => {
+    const limit = reason.limit === undefined ? "" : formatSensorValue(categoryKey, "input", reason.limit, fahrenheit);
+    switch (reason.kind) {
+    case "emergency": return cockpit.format(_("Above the emergency limit ($0)"), limit);
+    case "crit": return cockpit.format(_("Above the critical limit ($0)"), limit);
+    case "max": return cockpit.format(_("Above the maximum ($0)"), limit);
+    case "lcrit": return cockpit.format(_("Below the critical limit ($0)"), limit);
+    case "min": return cockpit.format(_("Below the minimum ($0)"), limit);
+    case "stopped": return _("Fan stopped");
+    case "crit_alarm": return _("Critical alarm reported by the chip");
+    case "alarm": return _("Alarm reported by the chip");
+    case "fault": return _("Sensor fault");
+    case "intrusion": return _("Chassis was opened");
+    }
+};
+
+export const formatReasons = (categoryKey: string, status: SensorStatus, fahrenheit: boolean): string =>
+    status.reasons.map(r => formatReason(categoryKey, r, fahrenheit)).join(", ");
 
 /*
  * A readable name for a chip, from the name of its kernel driver
