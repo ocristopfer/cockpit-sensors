@@ -73,14 +73,15 @@ class TestApplication(testlib.MachineCase):
         b.wait_in_text("tr:contains('fan1')", "Normal")
 
         # ignoring the alerts of a sensor removes it from the summary and the tab icon
-        b.click("tr:contains('fan2') .pf-v6-c-menu-toggle")
+        # (without Sizzle, ":contains()" only filters the last element of a selector)
+        b.click("tr[data-sensor='fan2'] .pf-v6-c-menu-toggle")
         b.click("button:contains('Ignore alerts')")
         b.wait_in_text("tr:contains('fan2')", "Alerts ignored")
         b.click(".pf-v6-c-tabs__link:contains('Overview')")
         b.wait_in_text(".sensors-overview-summary", "1 warning")
         b.wait_not_in_text(".sensors-overview-summary", "critical")
         b.click(".pf-v6-c-tabs__link:contains('Motherboard')")
-        b.click("tr:contains('fan2') .pf-v6-c-menu-toggle")
+        b.click("tr[data-sensor='fan2'] .pf-v6-c-menu-toggle")
         b.click("button:contains('Watch alerts')")
         b.wait_in_text("tr:contains('fan2')", "Critical")
         b.wait_in_text("tr:contains('SYSTIN')", "34.0 °C")

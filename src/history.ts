@@ -15,7 +15,7 @@ export type HistoryStatus =
     | "no-pmda" // the lm-sensors PMDA is not installed or exports no metrics
     | "no-logger" // pmlogger does not record lmsensors, or is not running
     | "no-python" // python3-pcp is missing, Cockpit cannot read archives
-    | "no-cockpit-pcp" // cockpit-pcp is missing, Cockpit has no channel to read archives
+    | "no-cockpit-pcp" // Cockpit < 326 without cockpit-pcp has no channel to read archives
     | "enabled";
 
 export type HistorySample = { t: number; v: number | null };
@@ -54,15 +54,28 @@ export const pcpMetricName = (chip: string, label: string): string => {
 export const hasHistory = (values: Record<string, number>): boolean =>
     Object.keys(values).some(key => key.includes("_input"));
 
-const STATUS_SCRIPT = `
+/*
+ * Cockpit reads PCP archives with its Python bridge since version 326, which
+ * dropped the cockpit-pcp package; older versions need cockpit-pcp for it.
+ */
+const COCKPIT_PCP_DROPPED = 326;
+const NEEDS_COCKPIT_PCP = String.raw`
+needs_cockpit_pcp() {
+    v=$(cockpit-bridge --version 2>/dev/null | sed -n 's/^Version: *\([0-9][0-9]*\).*/\1/p')
+    [ -n "$v" ] && [ "$v" -lt ${COCKPIT_PCP_DROPPED} ]
+}
+`;
+
+const STATUS_SCRIPT = `${NEEDS_COCKPIT_PCP}
 if ! command -v pminfo >/dev/null 2>&1; then echo no-pcp; exit 0; fi
 . /etc/pcp.env
 pminfo lmsensors >/dev/null 2>&1 || { echo no-pmda; exit 0; }
 grep -q '^#+ cockpit-sensors/lmsensors:y' "$PCP_VAR_DIR/config/pmlogger/config.default" 2>/dev/null || { echo no-logger; exit 0; }
 systemctl is-active -q pmlogger || { echo no-logger; exit 0; }
 python3 -c 'import pcp' 2>/dev/null || { echo no-python; exit 0; }
-# Cockpit reads PCP archives through the cockpit-pcp package (the "Metrics and history" page)
-[ -e /usr/share/cockpit/pcp/manifest.json ] || [ -e /usr/local/share/cockpit/pcp/manifest.json ] || { echo no-cockpit-pcp; exit 0; }
+if needs_cockpit_pcp && [ ! -e /usr/share/cockpit/pcp/manifest.json ] && [ ! -e /usr/local/share/cockpit/pcp/manifest.json ]; then
+    echo no-cockpit-pcp; exit 0
+fi
 echo enabled
 `;
 
@@ -71,25 +84,36 @@ export const getHistoryStatus = async (): Promise<HistoryStatus> => {
     return out.trim() as HistoryStatus;
 };
 
-// PCP packages per distribution, null when PCP is not packaged in the official repositories;
-// cockpit-pcp lets Cockpit read the recorded archives
-export const pcpPackages = (osIds: string[]): string[] | null => {
+export const needsCockpitPcp = async (): Promise<boolean> => {
+    const out = await cockpit.script(`${NEEDS_COCKPIT_PCP}
+needs_cockpit_pcp && echo yes || echo no`, { err: "message" });
+    return out.trim() === "yes";
+};
+
+const distroPcpPackages = (osIds: string[]): string[] | null => {
     for (const osId of osIds) {
         switch (osId) {
         case "fedora":
         case "rhel":
         case "centos":
-            return ["pcp", "python3-pcp", "pcp-pmda-lmsensors", "cockpit-pcp"];
+            return ["pcp", "python3-pcp", "pcp-pmda-lmsensors"];
         case "debian":
         case "ubuntu":
             // the lm-sensors PMDA is part of the pcp package
-            return ["pcp", "python3-pcp", "cockpit-pcp"];
+            return ["pcp", "python3-pcp"];
         case "suse":
         case "opensuse":
-            return ["pcp", "python3-pcp", "pcp-pmda-lmsensors", "cockpit-pcp"];
+            return ["pcp", "python3-pcp", "pcp-pmda-lmsensors"];
         }
     }
     return null;
+};
+
+// PCP packages per distribution, null when PCP is not packaged in the official repositories;
+// on Cockpit < 326, cockpit-pcp lets Cockpit read the recorded archives
+export const pcpPackages = (osIds: string[], cockpitPcp: boolean): string[] | null => {
+    const packages = distroPcpPackages(osIds);
+    return packages && cockpitPcp ? [...packages, "cockpit-pcp"] : packages;
 };
 
 const installCommand = (osIds: string[], packages: string[]): string[] => {
@@ -131,8 +155,7 @@ pmlogconf -q "$CFG" </dev/null >/dev/null
 systemctl restart pmlogger
 `;
 
-export const enableHistory = async (osIds: string[]): Promise<void> => {
-    const packages = pcpPackages(osIds);
+export const enableHistory = async (osIds: string[], packages: string[] | null): Promise<void> => {
     if (!packages)
         throw new Error(cockpit.format(cockpit.gettext("PCP is not available for $0"), osIds[0] ?? "unknown"));
 

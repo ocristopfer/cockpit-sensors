@@ -182,9 +182,12 @@ QUnit.module("history", () => {
     });
 
     QUnit.test("pcpPackages", assert => {
-        assert.deepEqual(pcpPackages(["ubuntu", "debian"]), ["pcp", "python3-pcp", "cockpit-pcp"]);
-        assert.deepEqual(pcpPackages(["rocky", "rhel"]), ["pcp", "python3-pcp", "pcp-pmda-lmsensors", "cockpit-pcp"]);
-        assert.equal(pcpPackages(["arch"]), null);
+        assert.deepEqual(pcpPackages(["ubuntu", "debian"], true), ["pcp", "python3-pcp", "cockpit-pcp"]);
+        assert.deepEqual(pcpPackages(["rocky", "rhel"], true), ["pcp", "python3-pcp", "pcp-pmda-lmsensors", "cockpit-pcp"]);
+        // Cockpit 326 dropped cockpit-pcp
+        assert.deepEqual(pcpPackages(["fedora"], false), ["pcp", "python3-pcp", "pcp-pmda-lmsensors"]);
+        assert.deepEqual(pcpPackages(["ubuntu", "debian"], false), ["pcp", "python3-pcp"]);
+        assert.equal(pcpPackages(["arch"], true), null);
     });
 
     QUnit.test("historyCsv", assert => {

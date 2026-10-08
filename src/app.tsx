@@ -30,7 +30,7 @@ import { ThermometerHalfIcon } from "@patternfly/react-icons/dist/esm/icons/ther
 import cockpit from "cockpit";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-import { enableHistory, getHistoryStatus, pcpPackages } from "./history";
+import { enableHistory, getHistoryStatus, needsCockpitPcp, pcpPackages } from "./history";
 import type { HistoryStatus } from "./history";
 import { page_status } from "notifications";
 
@@ -66,10 +66,10 @@ const EnableHistoryModal = ({ onClose, onEnabled }: { onClose: () => void; onEna
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        readOsIds()
-                .then(ids => {
+        Promise.all([readOsIds(), needsCockpitPcp().catch(() => false)])
+                .then(([ids, cockpitPcp]) => {
                     setOsIds(ids);
-                    setPackages(pcpPackages(ids));
+                    setPackages(pcpPackages(ids, cockpitPcp));
                 })
                 .catch(() => setPackages(null));
     }, []);
@@ -77,7 +77,7 @@ const EnableHistoryModal = ({ onClose, onEnabled }: { onClose: () => void; onEna
     const enable = () => {
         setRunning(true);
         setError(null);
-        enableHistory(osIds)
+        enableHistory(osIds, packages ?? null)
                 .then(onEnabled)
                 .catch((err: Error) => {
                     setError(err.message);

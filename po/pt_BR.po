@@ -62,8 +62,8 @@ msgid "The cockpit-pcp package is missing, so Cockpit cannot read the recorded h
 msgstr "O pacote cockpit-pcp não está instalado, então o Cockpit não consegue ler o histórico gravado."
 
 #: src/HistoryChart.tsx:244
-msgid "Cockpit cannot read PCP archives. Install the cockpit-pcp package."
-msgstr "O Cockpit não consegue ler os arquivos do PCP. Instale o pacote cockpit-pcp."
+msgid "Cockpit cannot read PCP archives. Install the python3-pcp package (and cockpit-pcp on Cockpit older than 326)."
+msgstr "O Cockpit não consegue ler os arquivos do PCP. Instale o pacote python3-pcp (e o cockpit-pcp no Cockpit anterior ao 326)."
 
 #: src/HistoryChart.tsx:263
 msgid "Sensor history is not enabled"
