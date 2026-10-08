@@ -125,7 +125,7 @@ export const SensorTable = ({ chipName, chipData, category }: {
 
                         return (
                             <Tbody key={label} isExpanded={isExpanded}>
-                                <Tr className={hidden ? "sensors-row-hidden" : ""}>
+                                <Tr className={hidden ? "sensors-row-hidden" : ""} data-sensor={label}>
                                     {withHistory
                                         ? <Td expand={{ rowIndex, isExpanded, onToggle: () => view.onToggleExpanded(metric), expandId: `history-${metric}` }} />
                                         : <Td />}

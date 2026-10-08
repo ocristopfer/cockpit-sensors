@@ -239,9 +239,9 @@ export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit,
                     })
                     .catch((err: Error) => {
                         if (!cancelled)
-                            // the metrics channel is missing when cockpit-pcp is not installed
+                            // the metrics channel is missing without python3-pcp (or cockpit-pcp before Cockpit 326)
                             setError(err.message === "not-supported"
-                                ? _("Cockpit cannot read PCP archives. Install the cockpit-pcp package.")
+                                ? _("Cockpit cannot read PCP archives. Install the python3-pcp package (and cockpit-pcp on Cockpit older than 326).")
                                 : err.message);
                     });
         };
