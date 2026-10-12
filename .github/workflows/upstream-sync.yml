@@ -1,0 +1,102 @@
+# Keeps the fork on top of cockpit-project/starter-kit: every day, the new upstream commits are
+# merged into `main` through a pull request (branch `sync/starter-kit`), where Packit builds and
+# tests them like any other change. A conflict opens an issue instead, to merge by hand.
+#
+# Uses the secret FORK_SYNC_TOKEN when set: a classic token with the `repo` and `workflow` scopes.
+# `workflow`, because upstream changes its own .github/workflows, which GITHUB_TOKEN cannot push;
+# and a pull request opened with it (not with GITHUB_TOKEN) also starts the GitHub Actions checks.
+name: upstream-sync
+
+on:
+  schedule:
+    - cron: "37 5 * * *"
+  # can be run manually on https://github.com/ocristopfer/cockpit-sensors/actions
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: https://github.com/cockpit-project/starter-kit.git
+  BRANCH: sync/starter-kit
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN || github.token }}
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.FORK_SYNC_TOKEN || github.token }}
+
+      - name: Merge upstream
+        id: sync
+        run: |
+          git config user.name "Cristopfer Luis"
+          git config user.email "ocristopfer@gmail.com"
+          git fetch --no-tags "$UPSTREAM" main
+          upstream=$(git rev-parse FETCH_HEAD)
+
+          if git merge-base --is-ancestor "$upstream" HEAD; then
+            echo "main already contains starter-kit $upstream"
+            echo "status=up-to-date" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          {
+            echo "New commits of [cockpit-project/starter-kit](https://github.com/cockpit-project/starter-kit):"
+            echo
+            git log --no-merges --format='- [`%h`](https://github.com/cockpit-project/starter-kit/commit/%H) %s' "HEAD..$upstream"
+            echo
+          } > summary.md
+
+          git checkout -B "$BRANCH"
+          if git merge --no-edit -m "Merge cockpit-project/starter-kit" "$upstream"; then
+            git push --force origin "$BRANCH"
+            echo "status=merged" >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "Merging them into \`main\` conflicts on:"
+              echo
+              git diff --name-only --diff-filter=U | sed 's/^/- `/; s/$/`/'
+              echo
+              echo "Merge by hand: \`git fetch upstream && git merge upstream/main\`, then open a pull request."
+            } >> summary.md
+            git merge --abort
+            echo "status=conflict" >> "$GITHUB_OUTPUT"
+          fi
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Pull request into main
+        if: steps.sync.outputs.status == 'merged'
+        run: |
+          title="Sync with cockpit-project/starter-kit ($(date -u +%Y-%m-%d))"
+          number=$(gh pr list -R "$GITHUB_REPOSITORY" --head "$BRANCH" --base main --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" -R "$GITHUB_REPOSITORY" --title "$title" --body-file summary.md
+            echo "updated #$number"
+          else
+            gh pr create -R "$GITHUB_REPOSITORY" --head "$BRANCH" --base main --title "$title" --body-file summary.md
+          fi
+
+      - name: Issue on conflict
+        if: steps.sync.outputs.status == 'conflict'
+        run: |
+          gh label create upstream-sync -R "$GITHUB_REPOSITORY" --color D93F0B --description "Upstream merge needs a hand" 2>/dev/null || true
+          number=$(gh issue list -R "$GITHUB_REPOSITORY" --label upstream-sync --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" -R "$GITHUB_REPOSITORY" --body-file summary.md
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" --title "Upstream sync: merge conflict" --label upstream-sync --body-file summary.md
+          fi
+          exit 1
