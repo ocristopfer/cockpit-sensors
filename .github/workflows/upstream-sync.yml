@@ -2,6 +2,12 @@
 # merged into `main` through a pull request (branch `sync/starter-kit`), where Packit builds and
 # tests them like any other change. A conflict opens an issue instead, to merge by hand.
 #
+# The fork runs the same bots as upstream (dependabot, cockpit-ci container and Cockpit lib
+# updates), so files they touch often conflict with no real decision to make. Those are resolved
+# here (see resolve() below): the newest cockpit-ci container, and the fork's side of the
+# conflicting hunks of package.json and Makefile (its own dependencies and Cockpit lib commit;
+# the non-conflicting upstream changes to these files are still merged).
+#
 # Uses the secret FORK_SYNC_TOKEN when set: a classic token with the `repo` and `workflow` scopes.
 # `workflow`, because upstream changes its own .github/workflows, which GITHUB_TOKEN cannot push;
 # and a pull request opened with it (not with GITHUB_TOKEN) also starts the GitHub Actions checks.
@@ -60,8 +66,51 @@ jobs:
             echo
           } > summary.md
 
+          # resolve a conflict in a file that the fork's own bots keep up to date; fails for any other file
+          resolve() {
+            f="$1"
+            case "$f" in
+              .cockpit-ci/container)
+                { git show ":2:$f"; git show ":3:$f"; } | sort -V | tail -n 1 > "$f"
+                ;;
+              package.json|Makefile)
+                git show ":1:$f" > "$RUNNER_TEMP/base" 2>/dev/null || : > "$RUNNER_TEMP/base"
+                git show ":2:$f" > "$RUNNER_TEMP/ours"
+                git show ":3:$f" > "$RUNNER_TEMP/theirs"
+                git merge-file --ours "$RUNNER_TEMP/ours" "$RUNNER_TEMP/base" "$RUNNER_TEMP/theirs" || true
+                cp "$RUNNER_TEMP/ours" "$f"
+                if [ "$f" = package.json ]; then jq empty package.json || return 1; fi
+                ;;
+              *)
+                return 1
+                ;;
+            esac
+            git add "$f"
+            echo "- \`$f\`" >> "$RUNNER_TEMP/resolved"
+          }
+
           git checkout -B "$BRANCH"
+          merged=false
           if git merge --no-edit -m "Merge cockpit-project/starter-kit" "$upstream"; then
+            merged=true
+          else
+            : > "$RUNNER_TEMP/resolved"
+            for f in $(git diff --name-only --diff-filter=U); do
+              resolve "$f" || true
+            done
+            if [ -z "$(git diff --name-only --diff-filter=U)" ]; then
+              git commit --no-edit
+              merged=true
+              {
+                echo "Conflicts resolved automatically, keeping the fork's side of the conflicting hunks (newest container for \`.cockpit-ci/container\`):"
+                echo
+                cat "$RUNNER_TEMP/resolved"
+                echo
+              } >> summary.md
+            fi
+          fi
+
+          if [ "$merged" = true ]; then
             git push --force origin "$BRANCH"
             echo "status=merged" >> "$GITHUB_OUTPUT"
           else
@@ -100,3 +149,10 @@ jobs:
             gh issue create -R "$GITHUB_REPOSITORY" --title "Upstream sync: merge conflict" --label upstream-sync --body-file summary.md
           fi
           exit 1
+
+      - name: Close the conflict issue
+        if: steps.sync.outputs.status == 'merged' || steps.sync.outputs.status == 'up-to-date'
+        run: |
+          for number in $(gh issue list -R "$GITHUB_REPOSITORY" --label upstream-sync --state open --json number --jq '.[].number'); do
+            gh issue close "$number" -R "$GITHUB_REPOSITORY" --comment "The upstream sync works again ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
+          done
