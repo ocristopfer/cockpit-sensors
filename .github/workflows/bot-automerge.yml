@@ -1,0 +1,85 @@
+# Merges the pull requests of the fork's own bots once their tests pass, so they need no review:
+# - sync/starter-kit          (upstream-sync.yml)
+# - cockpit-lib-*             (cockpit-lib-update.yml)
+# - cockpit-ci-container-*    (tasks-container-update.yml)
+#
+# A pull request is merged when it was opened by github-actions[bot] from one of these branches
+# of this repository, is mergeable, every check run on its head commit has finished without a
+# failure, and Packit ran the integration tests (at least one `testing-farm:*` check). Add the
+# `hold` label to a pull request to keep it from being merged.
+#
+# Runs when a check suite finishes (Packit, CodeQL), and every hour as a fallback.
+#
+# Needs the secret FORK_SYNC_TOKEN (see upstream-sync.yml): a classic token of the repository
+# owner with the `repo` and `workflow` scopes. The owner can merge past the required review, and
+# `workflow` is needed because the upstream merges change .github/workflows.
+name: bot-automerge
+
+on:
+  check_suite:
+    types: [completed]
+  schedule:
+    - cron: "17 * * * *"
+  # can be run manually on https://github.com/ocristopfer/cockpit-sensors/actions
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bot-automerge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Merge the bot pull requests whose tests passed
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::FORK_SYNC_TOKEN is not set, nothing is merged"
+            exit 0
+          fi
+
+          gh pr list -R "$REPO" --base main --state open --limit 50 \
+            --json number,author,headRefName,headRefOid,isCrossRepository,isDraft,labels \
+            --jq '.[]
+              | select(.author.login == "app/github-actions" and (.isCrossRepository | not) and (.isDraft | not))
+              | select(.headRefName == "sync/starter-kit"
+                       or (.headRefName | startswith("cockpit-lib-"))
+                       or (.headRefName | startswith("cockpit-ci-container-")))
+              | select([.labels[].name] | index("hold") | not)
+              | "\(.number) \(.headRefOid) \(.headRefName)"' > "$RUNNER_TEMP/prs"
+
+          while read -r number sha branch; do
+            # the latest run of each check on the head commit
+            gh api "repos/$REPO/commits/$sha/check-runs?per_page=100" --jq '[.check_runs[] | {name, status, conclusion}]' > "$RUNNER_TEMP/checks"
+            pending=$(jq '[.[] | select(.status != "completed")] | length' "$RUNNER_TEMP/checks")
+            failed=$(jq -r '[.[] | select(.status == "completed" and (.conclusion | IN("success", "neutral", "skipped") | not)) | .name] | join(", ")' "$RUNNER_TEMP/checks")
+            tests=$(jq '[.[] | select(.name | startswith("testing-farm:"))] | length' "$RUNNER_TEMP/checks")
+            statuses=$(gh api "repos/$REPO/commits/$sha/status" --jq 'if .total_count == 0 then "success" else .state end')
+            mergeable=$(gh pr view "$number" -R "$REPO" --json mergeable --jq .mergeable)
+
+            if [ -n "$failed" ]; then
+              echo "#$number: failed checks: $failed"
+            elif [ "$pending" -gt 0 ] || [ "$statuses" = pending ]; then
+              echo "#$number: $pending checks still running"
+            elif [ "$tests" -eq 0 ]; then
+              echo "#$number: Packit has not run the tests yet"
+            elif [ "$statuses" != success ]; then
+              echo "#$number: commit status is $statuses"
+            elif [ "$mergeable" != MERGEABLE ]; then
+              echo "#$number: not mergeable ($mergeable)"
+            else
+              echo "#$number: all checks passed, merging"
+              gh pr merge "$number" -R "$REPO" --merge --admin --match-head-commit "$sha"
+              # the sync branch is force-pushed again by the next sync; the others are one-off
+              if [ "$branch" != sync/starter-kit ]; then
+                gh api -X DELETE "repos/$REPO/git/refs/heads/$branch" || true
+              fi
+              echo "- merged #$number ($branch)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done < "$RUNNER_TEMP/prs"
