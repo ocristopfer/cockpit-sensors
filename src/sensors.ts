@@ -44,9 +44,13 @@ export const sensorCategories: SensorCategory[] = [
 // Sub-features that are flags/enums rather than measurements (e.g. temp1_crit_alarm, temp1_type)
 export const isFlagKey = (key: string): boolean => /(alarm|beep|fault|type)$/.test(key);
 
+// objects keyed by names read from `sensors` output have no prototype, so that
+// a name like "__proto__" cannot reach Object.prototype
+const dict = <T extends object>(): T => Object.create(null);
+
 // Parse the output of `sensors -u`, for lm-sensors versions without JSON support (-j)
 export const parseSensorsRaw = (output: string): SensorData => {
-    const data: SensorData = {};
+    const data = dict<SensorData>();
     let chip: SensorChipGroup | null = null;
     let label: string | null = null;
 
@@ -56,7 +60,7 @@ export const parseSensorsRaw = (output: string): SensorData => {
             continue;
         }
         if (chip === null) {
-            chip = {};
+            chip = dict<SensorChipGroup>();
             data[line.trim()] = chip;
             label = null;
             continue;
@@ -67,7 +71,7 @@ export const parseSensorsRaw = (output: string): SensorData => {
         }
         if (!/^\s/.test(line) && line.trimEnd().endsWith(":")) {
             label = line.trimEnd().slice(0, -1);
-            chip[label] = {};
+            chip[label] = dict<SensorValueGroup>();
             continue;
         }
         const match = /^\s+(\S+):\s+(\S+)/.exec(line);
