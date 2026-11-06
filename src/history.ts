@@ -173,6 +173,12 @@ export const enableHistory = async (osIds: string[], packages: string[] | null):
  * So link the archives that cover the range and contain the metric into a
  * temporary directory, and read that one. Archive names carry their start time
  * in the server's local time zone, so all of this runs on the server.
+ *
+ * pmlogger writes YYYYMMDD.HH.MM archives (with a -NN suffix on name clashes),
+ * and pmlogger_daily merges each day's archives into one YYYYMMDD archive
+ * (YYYYMMDD-NN on clashes), often compressing its volumes. A merged archive
+ * starts at some time during its day, so take the end of that day as its start:
+ * this may link one archive too many, but never misses one.
  * Arguments: metric, range start (seconds since the epoch). Prints the
  * directory, or nothing when no archive has the metric.
  */
@@ -185,24 +191,44 @@ src="$PCP_LOG_DIR/pmlogger/$(uname -n)"
 [ -d "$src" ] || exit 0
 dir=$(mktemp -d -t cockpit-sensors-history.XXXXXX)
 
+# link the files of one archive: .index, .meta and the data volumes .0, .1, …,
+# possibly compressed; not those of another archive whose name starts the same
+# (such as 20261105.00.10.* next to 20261105.*)
 add() {
-    if pminfo -a "$1" "$metric" >/dev/null 2>&1; then
-        ln -s "$1".* "$dir"/
-    fi
+    pminfo -a "$1" "$metric" >/dev/null 2>&1 || return 0
+    for file in "$1".*; do
+        name=$(echo "$file" | sed -n 's/\.\(index\|meta\|[0-9]\{1,3\}\)\(\.\(xz\|zst\|gz\|bz2\|lzma\)\)\{0,1\}$//p')
+        [ "$name" != "$1" ] || ln -s "$file" "$dir"/
+    done
 }
 
-prev=""
-for f in "$src"/*.index; do
+# "start-time archive" lines, sorted by start time
+list=$(for f in "$src"/*.index; do
     [ -e "$f" ] || continue
     archive=$(echo "$f" | sed 's/\.index$//')
-    stamp=$(basename "$archive" | sed -n 's/^\([0-9]\{4\}\)\([0-9]\{2\}\)\([0-9]\{2\}\)\.\([0-9]\{2\}\)\.\([0-9]\{2\}\).*/\1-\2-\3 \4:\5/p')
-    [ -n "$stamp" ] || continue
+    base=$(basename "$archive")
+    stamp=$(echo "$base" | sed -n 's/^\([0-9]\{4\}\)\([0-9]\{2\}\)\([0-9]\{2\}\)\.\([0-9]\{2\}\)\.\([0-9]\{2\}\)\(-[0-9]*\)\{0,1\}$/\1-\2-\3 \4:\5/p')
+    if [ -n "$stamp" ]; then
+        t=$(date -d "$stamp" +%s)
+    else
+        day=$(echo "$base" | sed -n 's/^\([0-9]\{4\}\)\([0-9]\{2\}\)\([0-9]\{2\}\)\(-[0-9]*\)\{0,1\}$/\1-\2-\3/p')
+        [ -n "$day" ] || continue
+        t=$(($(date -d "$day 00:00" +%s) + 86400))
+    fi
+    echo "$t $archive"
+done | sort -n -k1,1)
+
+prev=""
+while read -r t archive; do
+    [ -n "$archive" ] || continue
     # the previous archive ends where this one starts
-    if [ -n "$prev" ] && [ "$(date -d "$stamp" +%s)" -gt "$start" ]; then
+    if [ -n "$prev" ] && [ "$t" -gt "$start" ]; then
         add "$prev"
     fi
     prev="$archive"
-done
+done <<EOF
+$list
+EOF
 [ -z "$prev" ] || add "$prev"
 
 if [ -z "$(ls -A "$dir")" ]; then
