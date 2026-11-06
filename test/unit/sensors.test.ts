@@ -60,6 +60,13 @@ QUnit.module("sensors", () => {
         });
     });
 
+    QUnit.test("parseSensorsRaw does not pollute Object.prototype", assert => {
+        const data = parseSensorsRaw(["__proto__", "__proto__:", "  polluted: 1", ""].join("\n"));
+        assert.equal(({} as Record<string, unknown>).polluted, undefined);
+        assert.deepEqual(Object.keys(data), ["__proto__"]);
+        assert.deepEqual(Object.keys(data.__proto__.__proto__ as object), ["polluted"]);
+    });
+
     QUnit.test("formatSensorValue", assert => {
         assert.equal(formatSensorValue("temp", "input", 50, false), "50.0 °C");
         assert.equal(formatSensorValue("temp", "input", 50, true), "122.0 °F");
