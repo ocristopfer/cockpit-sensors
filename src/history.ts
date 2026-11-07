@@ -193,12 +193,20 @@ dir=$(mktemp -d -t cockpit-sensors-history.XXXXXX)
 
 # link the files of one archive: .index, .meta and the data volumes .0, .1, …,
 # possibly compressed; not those of another archive whose name starts the same
-# (such as 20261105.00.10.* next to 20261105.*)
+# (such as 20261105.00.10.* next to 20261105.*). libpcp cannot read a compressed
+# volume through a symlink (PCP 7.1 reports "Corrupted record" for a .0.zst
+# link), so copy compressed files; they are small, and pmlogger_daily only
+# compresses archives it is done with, so link the others, among them the one
+# pmlogger is writing.
 add() {
     pminfo -a "$1" "$metric" >/dev/null 2>&1 || return 0
     for file in "$1".*; do
         name=$(echo "$file" | sed -n 's/\.\(index\|meta\|[0-9]\{1,3\}\)\(\.\(xz\|zst\|gz\|bz2\|lzma\)\)\{0,1\}$//p')
-        [ "$name" != "$1" ] || ln -s "$file" "$dir"/
+        [ "$name" = "$1" ] || continue
+        case "$file" in
+            *.xz|*.zst|*.gz|*.bz2|*.lzma) cp "$file" "$dir"/ ;;
+            *) ln -s "$file" "$dir"/ ;;
+        esac
     done
 }
 
