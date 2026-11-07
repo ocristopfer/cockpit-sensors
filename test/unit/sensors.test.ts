@@ -1,7 +1,7 @@
 // Unit tests for the pure functions of src/; run with `npm run test:unit`
 
 import { historyCsv } from "../../src/csv";
-import { hasHistory, pcpMetricName, pcpPackages } from "../../src/history";
+import { hasHistory, lineSegments, pcpMetricName, pcpPackages } from "../../src/history";
 import {
     chipDisplayName, chipDisplayNames, extractSensorGroup, formatReasons, formatSensorValue, getOsIds, getReading,
     parseSensorsRaw, sensorStatus, worstLevel
@@ -181,6 +181,23 @@ QUnit.module("history", () => {
         assert.equal(pcpMetricName("nct6798-isa-0290", "in0"), "lmsensors.nct6798_isa_0290.in0");
         assert.equal(pcpMetricName("acpitz-acpi-0", "temp1"), "lmsensors.acpitz_acpi_0.temp1");
         assert.equal(pcpMetricName("x-isa-0", "Vcore 1.2"), "lmsensors.x_isa_0.vcore_1,2");
+    });
+
+    QUnit.test("lineSegments", assert => {
+        const min = 60 * 1000;
+        // values every `step` minutes, null at the given indexes
+        const series = (step: number, count: number, missing: number[]) =>
+            Array.from({ length: count }, (_, i) => ({ t: i * step * min, v: missing.includes(i) ? null : i }));
+        const lengths = (step: number, count: number, missing: number[]) =>
+            lineSegments(series(step, count, missing)).map(s => s.length);
+
+        assert.deepEqual(lengths(5, 6, []), [6]);
+        assert.deepEqual(lengths(5, 6, [2, 3]), [4], "24h: a 15-minute gap at an archive boundary is drawn across");
+        assert.deepEqual(lengths(30, 6, [2]), [5], "7d: a single missing sample is drawn across");
+        assert.deepEqual(lengths(5, 8, [2, 3, 4]), [2, 3], "a 20-minute gap splits the line");
+        assert.deepEqual(lengths(30, 6, [2, 3]), [2, 2], "7d: two missing samples split the line");
+        assert.deepEqual(lengths(5, 6, [0, 1, 5]), [3], "missing samples at the ends are dropped");
+        assert.deepEqual(lineSegments([{ t: 0, v: null }]), []);
     });
 
     QUnit.test("hasHistory", assert => {
