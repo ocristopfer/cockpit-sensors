@@ -10,6 +10,7 @@
 import cockpit from "cockpit";
 
 import { isNvidiaChip } from "./nvidia";
+import type { SensorChipGroup } from "./sensors";
 
 export type HistoryStatus =
     | "loading"
@@ -18,6 +19,7 @@ export type HistoryStatus =
     | "no-logger" // pmlogger does not record lmsensors, or is not running
     | "no-python" // python3-pcp is missing, Cockpit cannot read archives
     | "no-cockpit-pcp" // Cockpit < 326 without cockpit-pcp has no channel to read archives
+    | "no-gpu-logger" // the lm-sensors history works, but pmlogger does not record the NVIDIA GPUs
     | "enabled";
 
 export type HistorySample = { t: number; v: number | null };
@@ -87,10 +89,68 @@ export const pcpMetricName = (chip: string, label: string): string => {
     return `lmsensors.${clean(chip)}.${clean(label.replace(/\./g, ","))}`;
 };
 
-// sensors that pmdalmsensors exports: the lm-sensors ones with an *_input sub-feature
-// (not the NVIDIA GPUs read with nvidia-smi)
-export const hasHistory = (chipName: string, values: Record<string, number>): boolean =>
-    !isNvidiaChip(chipName) && Object.keys(values).some(key => key.includes("_input"));
+/*
+ * A recorded series: the PCP metric, its instance for instanced metrics, and
+ * the factor from its unit to the unit the sensor is shown in. The id names
+ * it in the UI (expanded rows, CSV file names).
+ */
+export type HistoryMetric = { id: string; name: string; instance?: string | undefined };
+
+/*
+ * The NVIDIA GPUs are recorded from nvidia-smi too, by a script that PCP's
+ * OpenMetrics agent (pmdaopenmetrics) runs: PCP's NVIDIA agent cannot read
+ * the fan of some cards (nvidia.fanspeed is "not supported" on a GTX 1060
+ * whose fan nvidia-smi reads). One instance per card, named after its
+ * nvidia-smi index ("gpu0"); the agent names it "0 instname:gpu0".
+ */
+const NVIDIA_SOURCE = "cockpit_sensors_nvidia";
+const NVIDIA_METRICS: Record<string, string> = {
+    temp: "temperature",
+    pwm: "fanspeed",
+    power: "power",
+};
+
+// the script for pmdaopenmetrics: the readings of each GPU in OpenMetrics text format
+export const NVIDIA_OPENMETRICS_SCRIPT = String.raw`#!/bin/sh
+# NVIDIA GPU readings for Cockpit Sensors, recorded by PCP through pmdaopenmetrics
+nvidia-smi --query-gpu=index,temperature.gpu,fan.speed,power.draw --format=csv,noheader,nounits 2>/dev/null |
+awk -F', *' '
+    { n++; gpu[n] = $1; v["temperature", n] = $2; v["fanspeed", n] = $3; v["power", n] = $4 }
+    END {
+        split("temperature fanspeed power", names, " ")
+        for (m = 1; m <= 3; m++) {
+            print "# TYPE " names[m] " gauge"
+            for (i = 1; i <= n; i++)
+                if (v[names[m], i] ~ /^[0-9]+(\.[0-9]+)?$/)
+                    printf "%s{instname=\"gpu%s\"} %s\n", names[m], gpu[i], v[names[m], i]
+        }
+    }'
+`;
+
+/*
+ * The recorded series of a sensor row, or null when it has none: the lm-sensors
+ * sensors with an *_input sub-feature, which pmdalmsensors exports, and the
+ * temperature, fan and power of the NVIDIA GPUs.
+ */
+export const historyMetric = (chipName: string, chip: SensorChipGroup, label: string, categoryKey: string): HistoryMetric | null => {
+    if (isNvidiaChip(chipName)) {
+        const metric = NVIDIA_METRICS[categoryKey];
+        if (!metric || typeof chip.Index !== "string")
+            return null;
+        const name = `openmetrics.${NVIDIA_SOURCE}.${metric}`;
+        const instance = `gpu${chip.Index}`;
+        return { id: `${name}.${instance}`, name, instance };
+    }
+    const values = chip[label];
+    if (typeof values !== "object" || !Object.keys(values).some(key => key.includes("_input")))
+        return null;
+    const name = pcpMetricName(chipName, label);
+    return { id: name, name };
+};
+
+// the history status of one row: GPUs may not be recorded while the lm-sensors history works
+export const rowHistoryStatus = (chipName: string, status: HistoryStatus): HistoryStatus =>
+    status === "no-gpu-logger" && !isNvidiaChip(chipName) ? "enabled" : status;
 
 /*
  * Cockpit reads PCP archives with its Python bridge since version 326, which
@@ -114,6 +174,13 @@ python3 -c 'import pcp' 2>/dev/null || { echo no-python; exit 0; }
 if needs_cockpit_pcp && [ ! -e /usr/share/cockpit/pcp/manifest.json ] && [ ! -e /usr/local/share/cockpit/pcp/manifest.json ]; then
     echo no-cockpit-pcp; exit 0
 fi
+# NVIDIA GPUs (see ENABLE_SCRIPT): history set up before they were supported records only lm-sensors
+if command -v nvidia-smi >/dev/null 2>&1; then
+    if [ ! -x "$PCP_PMDAS_DIR/openmetrics/config.d/${NVIDIA_SOURCE}.sh" ] ||
+            ! grep -q '^#+ cockpit-sensors/nvidia:y' "$PCP_VAR_DIR/config/pmlogger/config.default" 2>/dev/null; then
+        echo no-gpu-logger; exit 0
+    fi
+fi
 echo enabled
 `;
 
@@ -128,29 +195,29 @@ needs_cockpit_pcp && echo yes || echo no`, { err: "message" });
     return out.trim() === "yes";
 };
 
-const distroPcpPackages = (osIds: string[]): string[] | null => {
+const distroPcpPackages = (osIds: string[], nvidia: boolean): string[] | null => {
     for (const osId of osIds) {
         switch (osId) {
         case "fedora":
         case "rhel":
         case "centos":
-            return ["pcp", "python3-pcp", "pcp-pmda-lmsensors"];
-        case "debian":
-        case "ubuntu":
-            // the lm-sensors PMDA is part of the pcp package
-            return ["pcp", "python3-pcp"];
         case "suse":
         case "opensuse":
-            return ["pcp", "python3-pcp", "pcp-pmda-lmsensors"];
+            return ["pcp", "python3-pcp", "pcp-pmda-lmsensors", ...nvidia ? ["pcp-pmda-openmetrics"] : []];
+        case "debian":
+        case "ubuntu":
+            // the lm-sensors and OpenMetrics PMDAs are part of the pcp package
+            return ["pcp", "python3-pcp"];
         }
     }
     return null;
 };
 
 // PCP packages per distribution, null when PCP is not packaged in the official repositories;
-// on Cockpit < 326, cockpit-pcp lets Cockpit read the recorded archives
-export const pcpPackages = (osIds: string[], cockpitPcp: boolean): string[] | null => {
-    const packages = distroPcpPackages(osIds);
+// on Cockpit < 326, cockpit-pcp lets Cockpit read the recorded archives; NVIDIA GPUs are recorded
+// through the OpenMetrics PMDA
+export const pcpPackages = (osIds: string[], cockpitPcp: boolean, nvidia = false): string[] | null => {
+    const packages = distroPcpPackages(osIds, nvidia);
     return packages && cockpitPcp ? [...packages, "cockpit-pcp"] : packages;
 };
 
@@ -165,6 +232,9 @@ const installCommand = (osIds: string[], packages: string[]): string[] => {
 /*
  * Installs PCP, registers the lm-sensors PMDA and makes pmlogger record it
  * through a pmlogconf group, so that pmlogconf keeps it on config updates.
+ * With nvidia-smi, records the NVIDIA GPUs, which lm-sensors does not see, the
+ * same way: through NVIDIA_OPENMETRICS_SCRIPT, which the OpenMetrics PMDA runs
+ * and which comes in $NVIDIA_SCRIPT.
  * The install command is passed as arguments ("$@").
  */
 const ENABLE_SCRIPT = `
@@ -179,6 +249,15 @@ cd "$PCP_PMDAS_DIR/lmsensors"
 GROUP_DIR="$PCP_VAR_DIR/config/pmlogconf/cockpit-sensors"
 mkdir -p "$GROUP_DIR"
 printf '#pmlogconf-setup 2.0\\nident\\tlm-sensors readings (temperatures, fans, voltages) for Cockpit Sensors\\nforce\\tinclude\\ndelta\\t1 minute\\n\\tlmsensors\\n' > "$GROUP_DIR/lmsensors"
+rm -f "$GROUP_DIR/nvidia"
+if command -v nvidia-smi >/dev/null 2>&1; then
+    OM="$PCP_PMDAS_DIR/openmetrics"
+    [ -d "$OM" ] || { echo "the PCP OpenMetrics agent is not installed" >&2; exit 1; }
+    printf '%s' "$NVIDIA_SCRIPT" > "$OM/config.d/${NVIDIA_SOURCE}.sh"
+    chmod 755 "$OM/config.d/${NVIDIA_SOURCE}.sh"
+    (cd "$OM" && ./Install </dev/null)
+    printf '#pmlogconf-setup 2.0\\nident\\tNVIDIA GPU readings (temperature, fan, power) for Cockpit Sensors\\nforce\\tinclude\\ndelta\\t1 minute\\n\\topenmetrics.${NVIDIA_SOURCE}\\n' > "$GROUP_DIR/nvidia"
+fi
 
 systemctl enable --now pmlogger
 
@@ -200,7 +279,7 @@ export const enableHistory = async (osIds: string[], packages: string[] | null):
     await cockpit.script(ENABLE_SCRIPT, installCommand(osIds, packages), {
         err: "message",
         superuser: "require",
-        environ: ["DEBIAN_FRONTEND=noninteractive"],
+        environ: ["DEBIAN_FRONTEND=noninteractive", `NVIDIA_SCRIPT=${NVIDIA_OPENMETRICS_SCRIPT}`],
     });
 };
 
@@ -284,56 +363,88 @@ else
 fi
 `;
 
+type MetricsValue = number | null | false;
+
+/*
+ * Decodes the messages of a "metrics1" channel reading one metric into
+ * samples. Meta messages give the start time and interval of the following
+ * data messages, and the instances they hold values for, which change when an
+ * archive has other ones. Data messages are compressed: null (or a shorter
+ * array) means "unchanged", false means "no value"; an instanced metric has an
+ * array with one value per instance of the last meta message. An instance is
+ * matched by the last word of its name: pmdaopenmetrics prefixes its own id and
+ * the label name ("0 instname:gpu0").
+ */
+const instanceMatches = (name: unknown, instance: string): boolean =>
+    typeof name === "string" && name.split(/[ :]/).pop() === instance;
+
+export const metricsDecoder = (metric: HistoryMetric, interval: number) => {
+    const samples: HistorySample[] = [];
+    let timestamp = 0;
+    let step = interval;
+    let current: number | null = null;
+    // position of the requested instance in the values of an instanced metric, -1 while absent
+    let position = -1;
+
+    const decode = (message: unknown) => {
+        if (!Array.isArray(message)) {
+            const meta = message as { timestamp: number; interval: number; metrics?: { instances?: unknown }[] };
+            timestamp = meta.timestamp;
+            step = meta.interval;
+            const instances = meta.metrics?.[0]?.instances;
+            const instance = metric.instance;
+            position = instance && Array.isArray(instances) ? instances.findIndex(name => instanceMatches(name, instance)) : -1;
+            return;
+        }
+
+        for (const sample of message as (MetricsValue | MetricsValue[])[][]) {
+            let value = sample[0];
+            if (metric.instance) {
+                if (position < 0)
+                    value = false;
+                else if (Array.isArray(value))
+                    value = value[position] ?? null;
+            }
+            if (typeof value === "number")
+                current = value;
+            else if (value === false)
+                current = null;
+            samples.push({ t: timestamp, v: current });
+            timestamp += step;
+        }
+    };
+
+    return { decode, samples };
+};
+
 /*
  * Read the recorded values of one metric for a range from the pmlogger archives.
  * Resolves to [] when nothing was recorded yet.
  */
-export const loadHistory = async (metric: string, range: HistoryRange): Promise<HistorySample[]> => {
+export const loadHistory = async (metric: HistoryMetric, range: HistoryRange): Promise<HistorySample[]> => {
     const start = Date.now() - range.durationMs;
     const interval = Math.round(range.durationMs / range.points);
 
-    const dir = (await cockpit.script(PREPARE_ARCHIVES_SCRIPT, [metric, String(Math.floor(start / 1000))],
+    const dir = (await cockpit.script(PREPARE_ARCHIVES_SCRIPT, [metric.name, String(Math.floor(start / 1000))],
                                       { err: "message" })).trim();
     if (!dir)
         return [];
 
     try {
         return await new Promise((resolve, reject) => {
-            const samples: HistorySample[] = [];
-            let timestamp = 0;
-            let step = interval;
-            let current: number | null = null;
+            const { decode, samples } = metricsDecoder(metric, interval);
 
+            // all instances: the channel's "instances" option filters out everything when reading archives
             const channel = cockpit.channel({
                 payload: "metrics1",
                 source: dir,
                 interval,
                 timestamp: start,
                 limit: range.points,
-                metrics: [{ name: metric }],
+                metrics: [{ name: metric.name }],
             });
 
-            channel.addEventListener("message", (_event, data) => {
-                const message = JSON.parse(data);
-
-                // meta message: start time and interval of the following data messages
-                if (!Array.isArray(message)) {
-                    timestamp = message.timestamp;
-                    step = message.interval;
-                    return;
-                }
-
-                // data messages are compressed: null (or a shorter array) means "unchanged", false means "no value"
-                for (const sample of message as (number | null | false)[][]) {
-                    const value = sample[0];
-                    if (typeof value === "number")
-                        current = value;
-                    else if (value === false)
-                        current = null;
-                    samples.push({ t: timestamp, v: current });
-                    timestamp += step;
-                }
-            });
+            channel.addEventListener("message", (_event, data) => decode(JSON.parse(data)));
 
             channel.addEventListener("close", (_event, options) => {
                 if (options.problem)

@@ -49,6 +49,9 @@ export const parseNvidiaSmi = (output: string): SensorData => {
         const [index, busId, name, temp, fan, power, powerLimit] = line.split(",").map(field => field.trim());
         const chip: SensorChipGroup = Object.create(null);
         chip.Adapter = name || "NVIDIA GPU";
+        // the card's NVML index, which also numbers its instances in PCP ("gpu0")
+        if (/^\d+$/.test(index ?? ""))
+            chip.Index = index;
 
         const temperature = number(temp);
         if (temperature !== undefined)

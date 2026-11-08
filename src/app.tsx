@@ -32,7 +32,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { enableHistory, getHistoryStatus, needsCockpitPcp, pcpPackages } from "./history";
 import type { HistoryStatus } from "./history";
-import { readNvidiaGpus } from "./nvidia";
+import { isNvidiaChip, readNvidiaGpus } from "./nvidia";
 import { page_status } from "notifications";
 
 import { Overview } from "./Overview";
@@ -60,7 +60,7 @@ const refreshIntervals = [1, 2, 5, 10];
 // while the page is in the background, keep reading the sensors this often (ms) for the alert in Cockpit's menu
 const BACKGROUND_INTERVAL = 30 * 1000;
 
-const EnableHistoryModal = ({ onClose, onEnabled }: { onClose: () => void; onEnabled: () => void }) => {
+const EnableHistoryModal = ({ nvidia, onClose, onEnabled }: { nvidia: boolean; onClose: () => void; onEnabled: () => void }) => {
     const [packages, setPackages] = useState<string[] | null | undefined>(undefined);
     const [osIds, setOsIds] = useState<string[]>([]);
     const [running, setRunning] = useState(false);
@@ -70,10 +70,10 @@ const EnableHistoryModal = ({ onClose, onEnabled }: { onClose: () => void; onEna
         Promise.all([readOsIds(), needsCockpitPcp().catch(() => false)])
                 .then(([ids, cockpitPcp]) => {
                     setOsIds(ids);
-                    setPackages(pcpPackages(ids, cockpitPcp));
+                    setPackages(pcpPackages(ids, cockpitPcp, nvidia));
                 })
                 .catch(() => setPackages(null));
-    }, []);
+    }, [nvidia]);
 
     const enable = () => {
         setRunning(true);
@@ -106,6 +106,7 @@ const EnableHistoryModal = ({ onClose, onEnabled }: { onClose: () => void; onEna
                                             : _("install PCP, if missing")}
                                     </li>
                                     <li>{_("enable the PCP lm-sensors agent (pmdalmsensors)")}</li>
+                                    {nvidia && <li>{_("enable the PCP OpenMetrics agent (pmdaopenmetrics) to record the NVIDIA GPUs from nvidia-smi")}</li>}
                                     <li>{_("record all sensor readings every minute with pmlogger")}</li>
                                 </ul>
                                 <p>
@@ -628,6 +629,7 @@ const Application = () => {
                     </PageSection>}
                 {showEnableHistory &&
                     <EnableHistoryModal
+                        nvidia={Object.keys(sensorData).some(isNvidiaChip)}
                         onClose={() => setShowEnableHistory(false)}
                         onEnabled={() => {
                             setShowEnableHistory(false);
