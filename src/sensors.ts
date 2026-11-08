@@ -33,6 +33,8 @@ export type SensorCategory = {
 export const sensorCategories: SensorCategory[] = [
     { key: "temp", label: _("Temperatures"), icon: ThermometerHalfIcon },
     { key: "fan", label: _("Fans"), icon: FanIcon },
+    // fan duty cycle in percent; libsensors has none, NVIDIA GPUs report their fans so (see nvidia.ts)
+    { key: "pwm", label: _("Fan duty"), icon: FanIcon },
     { key: "in", label: _("Voltages"), icon: ChargingStationIcon },
     { key: "power", label: _("Power"), icon: BoltIcon },
     { key: "curr", label: _("Currents"), icon: PlugIcon },
@@ -133,6 +135,7 @@ export const unitLabel = (categoryKey: string, fahrenheit: boolean): string => {
     switch (categoryKey) {
     case "temp": return fahrenheit ? "°F" : "°C";
     case "fan": return "RPM";
+    case "pwm": return "%";
     case "in": return "V";
     case "power": return "W";
     case "curr": return "A";
@@ -149,6 +152,8 @@ export const formatDisplayValue = (categoryKey: string, value: number, fahrenhei
         return `${value.toFixed(1)} ${fahrenheit ? "°F" : "°C"}`;
     case "fan":
         return cockpit.format(_("$0 RPM"), value.toFixed(0));
+    case "pwm":
+        return `${value.toFixed(0)} %`;
     case "in":
         return `${value.toFixed(2)} V`;
     case "power":
@@ -337,7 +342,7 @@ const chipDrivers: [RegExp, () => string][] = [
     [/^coretemp$/, () => _("CPU (Intel)")],
     [/^(k8temp|k10temp|zenpower|fam15h_power)$/, () => _("CPU (AMD)")],
     [/^(cpu_thermal|cpu-thermal|soc_thermal)$/, () => _("CPU")],
-    [/^(amdgpu|radeon|nouveau|i915|xe)$/, () => _("GPU")],
+    [/^(amdgpu|radeon|nouveau|i915|xe|nvidia)$/, () => _("GPU")],
     [/^nvme$/, () => _("NVMe drive")],
     [/^drivetemp$/, () => _("Disk")],
     [/^(acpitz|thermal_zone\d*)$/, () => _("ACPI thermal zone")],
