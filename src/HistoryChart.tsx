@@ -214,7 +214,7 @@ export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit,
     const [error, setError] = useState<string | null>(null);
 
     // the row passes a new object on every render, so depend on its fields
-    const { id: metricId, name: metricName, instance, scale } = metric;
+    const { id: metricId, name: metricName, instance } = metric;
     useEffect(() => {
         if (status !== "enabled")
             return;
@@ -222,7 +222,7 @@ export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit,
         let cancelled = false;
         const load = () => {
             const end = Date.now();
-            loadHistory({ id: metricId, name: metricName, instance, scale }, range)
+            loadHistory({ id: metricId, name: metricName, instance }, range)
                     .then(result => {
                         if (cancelled)
                             return;
@@ -246,7 +246,7 @@ export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit,
             cancelled = true;
             clearInterval(timer);
         };
-    }, [metricId, metricName, instance, scale, range, status]);
+    }, [metricId, metricName, instance, range, status]);
 
     if (status === "loading")
         return <Spinner size="lg" />;

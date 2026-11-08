@@ -235,14 +235,15 @@ QUnit.module("history", () => {
         assert.equal(historyMetric("nct6798-isa-0290", { intrusion0: { intrusion0_alarm: 0 } }, "intrusion0", "intrusion"), null,
                      "pmdalmsensors exports only sensors with an input");
 
-        // NVIDIA GPUs: recorded by pmdanvidia, one instance per card, power in milliwatts
+        // NVIDIA GPUs: recorded from nvidia-smi through pmdaopenmetrics, one instance per card
         const gpu = parseNvidiaSmi("0, 00000000:02:00.0, NVIDIA GeForce GTX 1060 3GB, 69, 38, 83.51, 120.00")["nvidia-pci-0200"];
+        const om = "openmetrics.cockpit_sensors_nvidia";
         assert.deepEqual(historyMetric("nvidia-pci-0200", gpu, "GPU", "temp"),
-                         { id: "nvidia.temperature.gpu0", name: "nvidia.temperature", instance: "gpu0", scale: undefined });
+                         { id: `${om}.temperature.gpu0`, name: `${om}.temperature`, instance: "gpu0" });
         assert.deepEqual(historyMetric("nvidia-pci-0200", gpu, "Fan", "pwm"),
-                         { id: "nvidia.fanspeed.gpu0", name: "nvidia.fanspeed", instance: "gpu0", scale: undefined });
+                         { id: `${om}.fanspeed.gpu0`, name: `${om}.fanspeed`, instance: "gpu0" });
         assert.deepEqual(historyMetric("nvidia-pci-0200", gpu, "Power", "power"),
-                         { id: "nvidia.power.gpu0", name: "nvidia.power", instance: "gpu0", scale: 0.001 });
+                         { id: `${om}.power.gpu0`, name: `${om}.power`, instance: "gpu0" });
         assert.equal(historyMetric("nvidia-pci-0200", { GPU: { temp1_input: 69 } }, "GPU", "temp"), null,
                      "no instance without the card's index");
     });
@@ -261,11 +262,15 @@ QUnit.module("history", () => {
         assert.deepEqual(temperature.samples.map(s => s.v), [null, 67, 68, 68, 68, null], "shorter arrays and null mean unchanged");
         assert.deepEqual(temperature.samples.map(s => s.t), [1000, 61000, 121000, 181000, 241000, 301000]);
 
-        const power = metricsDecoder({ id: "p", name: "nvidia.power", instance: "gpu1", scale: 0.001 }, 60000);
-        power.decode({ timestamp: 0, interval: 60000, metrics: [{ name: "nvidia.power", instances: ["gpu0", "gpu1"] }] });
-        power.decode([[[50000, 83510]], [[null, 62480]]]);
-        assert.deepEqual(power.samples.map(s => s.v === null ? null : Math.round(s.v * 1000) / 1000), [83.51, 62.48],
-                         "the requested instance, in watts");
+        // pmdaopenmetrics names instances "<id> instname:<label>"
+        const power = metricsDecoder({ id: "p", name: "openmetrics.cockpit_sensors_nvidia.power", instance: "gpu1" }, 60000);
+        power.decode({ timestamp: 0, interval: 60000, metrics: [{ name: "openmetrics.cockpit_sensors_nvidia.power", instances: ["0 instname:gpu0", "1 instname:gpu1"] }] });
+        power.decode([[[50.0, 83.51]], [[null, 62.48]]]);
+        assert.deepEqual(power.samples.map(s => s.v), [83.51, 62.48], "the requested instance");
+        const gpu10 = metricsDecoder({ id: "g", name: "x", instance: "gpu1" }, 60000);
+        gpu10.decode({ timestamp: 0, interval: 60000, metrics: [{ name: "x", instances: ["0 instname:gpu10"] }] });
+        gpu10.decode([[[1]]]);
+        assert.deepEqual(gpu10.samples.map(s => s.v), [null], "gpu1 is not gpu10");
 
         const other = metricsDecoder({ id: "o", name: "nvidia.power", instance: "gpu3" }, 60000);
         other.decode({ timestamp: 0, interval: 60000, metrics: [{ name: "nvidia.power", instances: ["gpu0"] }] });
@@ -292,8 +297,8 @@ QUnit.module("history", () => {
         assert.deepEqual(pcpPackages(["fedora"], false), ["pcp", "python3-pcp", "pcp-pmda-lmsensors"]);
         assert.deepEqual(pcpPackages(["ubuntu", "debian"], false), ["pcp", "python3-pcp"]);
         assert.equal(pcpPackages(["arch"], true), null);
-        // the NVIDIA PMDA: its own package outside Debian and Ubuntu
-        assert.deepEqual(pcpPackages(["fedora"], false, true), ["pcp", "python3-pcp", "pcp-pmda-lmsensors", "pcp-pmda-nvidia-gpu"]);
+        // NVIDIA GPUs need the OpenMetrics PMDA: its own package outside Debian and Ubuntu
+        assert.deepEqual(pcpPackages(["fedora"], false, true), ["pcp", "python3-pcp", "pcp-pmda-lmsensors", "pcp-pmda-openmetrics"]);
         assert.deepEqual(pcpPackages(["debian"], false, true), ["pcp", "python3-pcp"]);
     });
 

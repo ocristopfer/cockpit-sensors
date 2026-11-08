@@ -106,7 +106,7 @@ const EnableHistoryModal = ({ nvidia, onClose, onEnabled }: { nvidia: boolean; o
                                             : _("install PCP, if missing")}
                                     </li>
                                     <li>{_("enable the PCP lm-sensors agent (pmdalmsensors)")}</li>
-                                    {nvidia && <li>{_("enable the PCP NVIDIA agent (pmdanvidia) for the NVIDIA GPUs")}</li>}
+                                    {nvidia && <li>{_("enable the PCP OpenMetrics agent (pmdaopenmetrics) to record the NVIDIA GPUs from nvidia-smi")}</li>}
                                     <li>{_("record all sensor readings every minute with pmlogger")}</li>
                                 </ul>
                                 <p>

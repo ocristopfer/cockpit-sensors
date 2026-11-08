@@ -94,18 +94,38 @@ export const pcpMetricName = (chip: string, label: string): string => {
  * the factor from its unit to the unit the sensor is shown in. The id names
  * it in the UI (expanded rows, CSV file names).
  */
-export type HistoryMetric = { id: string; name: string; instance?: string | undefined; scale?: number | undefined };
+export type HistoryMetric = { id: string; name: string; instance?: string | undefined };
 
 /*
- * The NVIDIA GPUs, read with nvidia-smi, are recorded by the PCP NVIDIA agent
- * (pmdanvidia), one instance per card ("gpu0") numbered like nvidia-smi's
- * index. It reports the power in milliwatts.
+ * The NVIDIA GPUs are recorded from nvidia-smi too, by a script that PCP's
+ * OpenMetrics agent (pmdaopenmetrics) runs: PCP's NVIDIA agent cannot read
+ * the fan of some cards (nvidia.fanspeed is "not supported" on a GTX 1060
+ * whose fan nvidia-smi reads). One instance per card, named after its
+ * nvidia-smi index ("gpu0"); the agent names it "0 instname:gpu0".
  */
-const NVIDIA_METRICS: Record<string, { name: string; scale?: number }> = {
-    temp: { name: "nvidia.temperature" },
-    pwm: { name: "nvidia.fanspeed" },
-    power: { name: "nvidia.power", scale: 0.001 },
+const NVIDIA_SOURCE = "cockpit_sensors_nvidia";
+const NVIDIA_METRICS: Record<string, string> = {
+    temp: "temperature",
+    pwm: "fanspeed",
+    power: "power",
 };
+
+// the script for pmdaopenmetrics: the readings of each GPU in OpenMetrics text format
+export const NVIDIA_OPENMETRICS_SCRIPT = String.raw`#!/bin/sh
+# NVIDIA GPU readings for Cockpit Sensors, recorded by PCP through pmdaopenmetrics
+nvidia-smi --query-gpu=index,temperature.gpu,fan.speed,power.draw --format=csv,noheader,nounits 2>/dev/null |
+awk -F', *' '
+    { n++; gpu[n] = $1; v["temperature", n] = $2; v["fanspeed", n] = $3; v["power", n] = $4 }
+    END {
+        split("temperature fanspeed power", names, " ")
+        for (m = 1; m <= 3; m++) {
+            print "# TYPE " names[m] " gauge"
+            for (i = 1; i <= n; i++)
+                if (v[names[m], i] ~ /^[0-9]+(\.[0-9]+)?$/)
+                    printf "%s{instname=\"gpu%s\"} %s\n", names[m], gpu[i], v[names[m], i]
+        }
+    }'
+`;
 
 /*
  * The recorded series of a sensor row, or null when it has none: the lm-sensors
@@ -117,8 +137,9 @@ export const historyMetric = (chipName: string, chip: SensorChipGroup, label: st
         const metric = NVIDIA_METRICS[categoryKey];
         if (!metric || typeof chip.Index !== "string")
             return null;
+        const name = `openmetrics.${NVIDIA_SOURCE}.${metric}`;
         const instance = `gpu${chip.Index}`;
-        return { id: `${metric.name}.${instance}`, name: metric.name, instance, scale: metric.scale };
+        return { id: `${name}.${instance}`, name, instance };
     }
     const values = chip[label];
     if (typeof values !== "object" || !Object.keys(values).some(key => key.includes("_input")))
@@ -154,9 +175,11 @@ if needs_cockpit_pcp && [ ! -e /usr/share/cockpit/pcp/manifest.json ] && [ ! -e 
     echo no-cockpit-pcp; exit 0
 fi
 # NVIDIA GPUs (see ENABLE_SCRIPT): history set up before they were supported records only lm-sensors
-if command -v nvidia-smi >/dev/null 2>&1 &&
-        ! grep -q '^#+ cockpit-sensors/nvidia:y' "$PCP_VAR_DIR/config/pmlogger/config.default" 2>/dev/null; then
-    echo no-gpu-logger; exit 0
+if command -v nvidia-smi >/dev/null 2>&1; then
+    if [ ! -x "$PCP_PMDAS_DIR/openmetrics/config.d/${NVIDIA_SOURCE}.sh" ] ||
+            ! grep -q '^#+ cockpit-sensors/nvidia:y' "$PCP_VAR_DIR/config/pmlogger/config.default" 2>/dev/null; then
+        echo no-gpu-logger; exit 0
+    fi
 fi
 echo enabled
 `;
@@ -180,10 +203,10 @@ const distroPcpPackages = (osIds: string[], nvidia: boolean): string[] | null =>
         case "centos":
         case "suse":
         case "opensuse":
-            return ["pcp", "python3-pcp", "pcp-pmda-lmsensors", ...nvidia ? ["pcp-pmda-nvidia-gpu"] : []];
+            return ["pcp", "python3-pcp", "pcp-pmda-lmsensors", ...nvidia ? ["pcp-pmda-openmetrics"] : []];
         case "debian":
         case "ubuntu":
-            // the lm-sensors and NVIDIA PMDAs are part of the pcp package
+            // the lm-sensors and OpenMetrics PMDAs are part of the pcp package
             return ["pcp", "python3-pcp"];
         }
     }
@@ -191,7 +214,8 @@ const distroPcpPackages = (osIds: string[], nvidia: boolean): string[] | null =>
 };
 
 // PCP packages per distribution, null when PCP is not packaged in the official repositories;
-// on Cockpit < 326, cockpit-pcp lets Cockpit read the recorded archives; with NVIDIA GPUs, their PMDA
+// on Cockpit < 326, cockpit-pcp lets Cockpit read the recorded archives; NVIDIA GPUs are recorded
+// through the OpenMetrics PMDA
 export const pcpPackages = (osIds: string[], cockpitPcp: boolean, nvidia = false): string[] | null => {
     const packages = distroPcpPackages(osIds, nvidia);
     return packages && cockpitPcp ? [...packages, "cockpit-pcp"] : packages;
@@ -208,8 +232,9 @@ const installCommand = (osIds: string[], packages: string[]): string[] => {
 /*
  * Installs PCP, registers the lm-sensors PMDA and makes pmlogger record it
  * through a pmlogconf group, so that pmlogconf keeps it on config updates.
- * With nvidia-smi, does the same for the NVIDIA PMDA, which reads the GPUs
- * that lm-sensors does not see.
+ * With nvidia-smi, records the NVIDIA GPUs, which lm-sensors does not see, the
+ * same way: through NVIDIA_OPENMETRICS_SCRIPT, which the OpenMetrics PMDA runs
+ * and which comes in $NVIDIA_SCRIPT.
  * The install command is passed as arguments ("$@").
  */
 const ENABLE_SCRIPT = `
@@ -226,9 +251,12 @@ mkdir -p "$GROUP_DIR"
 printf '#pmlogconf-setup 2.0\\nident\\tlm-sensors readings (temperatures, fans, voltages) for Cockpit Sensors\\nforce\\tinclude\\ndelta\\t1 minute\\n\\tlmsensors\\n' > "$GROUP_DIR/lmsensors"
 rm -f "$GROUP_DIR/nvidia"
 if command -v nvidia-smi >/dev/null 2>&1; then
-    [ -d "$PCP_PMDAS_DIR/nvidia" ] || { echo "the PCP NVIDIA agent is not installed" >&2; exit 1; }
-    (cd "$PCP_PMDAS_DIR/nvidia" && ./Install </dev/null)
-    printf '#pmlogconf-setup 2.0\\nident\\tNVIDIA GPU readings (temperature, fan, power) for Cockpit Sensors\\nforce\\tinclude\\ndelta\\t1 minute\\n\\tnvidia.temperature\\n\\tnvidia.fanspeed\\n\\tnvidia.power\\n' > "$GROUP_DIR/nvidia"
+    OM="$PCP_PMDAS_DIR/openmetrics"
+    [ -d "$OM" ] || { echo "the PCP OpenMetrics agent is not installed" >&2; exit 1; }
+    printf '%s' "$NVIDIA_SCRIPT" > "$OM/config.d/${NVIDIA_SOURCE}.sh"
+    chmod 755 "$OM/config.d/${NVIDIA_SOURCE}.sh"
+    (cd "$OM" && ./Install </dev/null)
+    printf '#pmlogconf-setup 2.0\\nident\\tNVIDIA GPU readings (temperature, fan, power) for Cockpit Sensors\\nforce\\tinclude\\ndelta\\t1 minute\\n\\topenmetrics.${NVIDIA_SOURCE}\\n' > "$GROUP_DIR/nvidia"
 fi
 
 systemctl enable --now pmlogger
@@ -251,7 +279,7 @@ export const enableHistory = async (osIds: string[], packages: string[] | null):
     await cockpit.script(ENABLE_SCRIPT, installCommand(osIds, packages), {
         err: "message",
         superuser: "require",
-        environ: ["DEBIAN_FRONTEND=noninteractive"],
+        environ: ["DEBIAN_FRONTEND=noninteractive", `NVIDIA_SCRIPT=${NVIDIA_OPENMETRICS_SCRIPT}`],
     });
 };
 
@@ -343,11 +371,15 @@ type MetricsValue = number | null | false;
  * data messages, and the instances they hold values for, which change when an
  * archive has other ones. Data messages are compressed: null (or a shorter
  * array) means "unchanged", false means "no value"; an instanced metric has an
- * array with one value per instance of the last meta message.
+ * array with one value per instance of the last meta message. An instance is
+ * matched by the last word of its name: pmdaopenmetrics prefixes its own id and
+ * the label name ("0 instname:gpu0").
  */
+const instanceMatches = (name: unknown, instance: string): boolean =>
+    typeof name === "string" && name.split(/[ :]/).pop() === instance;
+
 export const metricsDecoder = (metric: HistoryMetric, interval: number) => {
     const samples: HistorySample[] = [];
-    const scale = metric.scale ?? 1;
     let timestamp = 0;
     let step = interval;
     let current: number | null = null;
@@ -360,7 +392,8 @@ export const metricsDecoder = (metric: HistoryMetric, interval: number) => {
             timestamp = meta.timestamp;
             step = meta.interval;
             const instances = meta.metrics?.[0]?.instances;
-            position = metric.instance && Array.isArray(instances) ? instances.indexOf(metric.instance) : -1;
+            const instance = metric.instance;
+            position = instance && Array.isArray(instances) ? instances.findIndex(name => instanceMatches(name, instance)) : -1;
             return;
         }
 
@@ -373,7 +406,7 @@ export const metricsDecoder = (metric: HistoryMetric, interval: number) => {
                     value = value[position] ?? null;
             }
             if (typeof value === "number")
-                current = value * scale;
+                current = value;
             else if (value === false)
                 current = null;
             samples.push({ t: timestamp, v: current });
