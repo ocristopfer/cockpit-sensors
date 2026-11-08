@@ -15,7 +15,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as timeformat from "timeformat";
 
 import { historyRanges, lineSegments, loadHistory, LOG_INTERVAL_MS } from "./history";
-import type { HistoryRange, HistorySample, HistoryStatus } from "./history";
+import type { HistoryMetric, HistoryRange, HistorySample, HistoryStatus } from "./history";
 import { formatDisplayValue, toDisplayValue, unitLabel } from "./sensors";
 import { historyCsv } from "./csv";
 
@@ -175,6 +175,8 @@ const statusMessage = (status: HistoryStatus): string => {
         return _("The PCP lm-sensors agent is not enabled.");
     case "no-logger":
         return _("PCP is not recording the sensors.");
+    case "no-gpu-logger":
+        return _("PCP is not recording the NVIDIA GPUs.");
     case "no-python":
         return _("The python3-pcp package is missing, so the recorded history cannot be read.");
     case "no-cockpit-pcp":
@@ -197,7 +199,7 @@ const downloadCsv = (fileName: string, csv: string) => {
 };
 
 export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit, status, onEnable }: {
-    metric: string;
+    metric: HistoryMetric;
     name: string;
     categoryKey: string;
     fahrenheit: boolean;
@@ -211,6 +213,8 @@ export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit,
     const [timeWindow, setTimeWindow] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
     const [error, setError] = useState<string | null>(null);
 
+    // the row passes a new object on every render, so depend on its fields
+    const { id: metricId, name: metricName, instance, scale } = metric;
     useEffect(() => {
         if (status !== "enabled")
             return;
@@ -218,7 +222,7 @@ export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit,
         let cancelled = false;
         const load = () => {
             const end = Date.now();
-            loadHistory(metric, range)
+            loadHistory({ id: metricId, name: metricName, instance, scale }, range)
                     .then(result => {
                         if (cancelled)
                             return;
@@ -242,7 +246,7 @@ export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit,
             cancelled = true;
             clearInterval(timer);
         };
-    }, [metric, range, status]);
+    }, [metricId, metricName, instance, scale, range, status]);
 
     if (status === "loading")
         return <Spinner size="lg" />;
@@ -318,7 +322,7 @@ export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit,
                         <ToggleGroupItem
                             key={r.id}
                             text={rangeLabel(r)}
-                            buttonId={`history-range-${metric}-${r.id}`}
+                            buttonId={`history-range-${metricId}-${r.id}`}
                             isSelected={r.id === range.id}
                             onChange={() => setRange(r)}
                         />
@@ -328,7 +332,7 @@ export const HistoryPanel = ({ metric, name, categoryKey, fahrenheit, max, crit,
                     variant="link"
                     icon={<DownloadIcon />}
                     isDisabled={values.length === 0}
-                    onClick={() => downloadCsv(`${metric}-${range.id}.csv`, historyCsv(name, display, unitLabel(categoryKey, fahrenheit)))}
+                    onClick={() => downloadCsv(`${metricId}-${range.id}.csv`, historyCsv(name, display, unitLabel(categoryKey, fahrenheit)))}
                 >
                     {_("Export CSV")}
                 </Button>

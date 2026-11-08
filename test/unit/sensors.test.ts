@@ -1,7 +1,7 @@
 // Unit tests for the pure functions of src/; run with `npm run test:unit`
 
 import { historyCsv } from "../../src/csv";
-import { hasHistory, lineSegments, pcpMetricName, pcpPackages } from "../../src/history";
+import { historyMetric, lineSegments, metricsDecoder, pcpMetricName, pcpPackages, rowHistoryStatus } from "../../src/history";
 import { parseNvidiaSmi } from "../../src/nvidia";
 import {
     chipDisplayName, chipDisplayNames, extractSensorGroup, formatReasons, formatSensorValue, getOsIds, getReading,
@@ -173,9 +173,10 @@ QUnit.module("sensors", () => {
             "",
         ].join("\n"));
         assert.deepEqual(Object.keys(two), ["nvidia-pci-0100", "nvidia-pci-81fb"], "device 1f, function 3 is devfn fb");
-        assert.deepEqual(Object.keys(two["nvidia-pci-0100"]), ["Adapter", "GPU", "Power"]);
+        assert.deepEqual(Object.keys(two["nvidia-pci-0100"]), ["Adapter", "Index", "GPU", "Power"]);
         assert.deepEqual(two["nvidia-pci-0100"].Power, { power1_input: 55.1 }, "no cap when the limit is unknown");
-        assert.deepEqual(Object.keys(two["nvidia-pci-81fb"]), ["Adapter"]);
+        assert.deepEqual(Object.keys(two["nvidia-pci-81fb"]), ["Adapter", "Index"]);
+        assert.equal(two["nvidia-pci-81fb"].Index, "1", "the NVML index numbers the PCP instances");
         assert.deepEqual(Object.keys(parseNvidiaSmi("0, unknown, X, 50, 0, 0, 0")), ["nvidia-gpu-0"]);
         assert.deepEqual(parseNvidiaSmi(""), {});
     });
@@ -228,10 +229,60 @@ QUnit.module("history", () => {
         assert.deepEqual(lineSegments([{ t: 0, v: null }]), []);
     });
 
-    QUnit.test("hasHistory", assert => {
-        assert.true(hasHistory("coretemp-isa-0000", { temp1_input: 1 }));
-        assert.false(hasHistory("nct6798-isa-0290", { intrusion0_alarm: 0 }));
-        assert.false(hasHistory("nvidia-pci-0200", { temp1_input: 69 }), "pmdalmsensors does not see NVIDIA GPUs");
+    QUnit.test("historyMetric", assert => {
+        assert.deepEqual(historyMetric("coretemp-isa-0000", { "Core 0": { temp1_input: 1 } }, "Core 0", "temp"),
+                         { id: "lmsensors.coretemp_isa_0000.core_0", name: "lmsensors.coretemp_isa_0000.core_0" });
+        assert.equal(historyMetric("nct6798-isa-0290", { intrusion0: { intrusion0_alarm: 0 } }, "intrusion0", "intrusion"), null,
+                     "pmdalmsensors exports only sensors with an input");
+
+        // NVIDIA GPUs: recorded by pmdanvidia, one instance per card, power in milliwatts
+        const gpu = parseNvidiaSmi("0, 00000000:02:00.0, NVIDIA GeForce GTX 1060 3GB, 69, 38, 83.51, 120.00")["nvidia-pci-0200"];
+        assert.deepEqual(historyMetric("nvidia-pci-0200", gpu, "GPU", "temp"),
+                         { id: "nvidia.temperature.gpu0", name: "nvidia.temperature", instance: "gpu0", scale: undefined });
+        assert.deepEqual(historyMetric("nvidia-pci-0200", gpu, "Fan", "pwm"),
+                         { id: "nvidia.fanspeed.gpu0", name: "nvidia.fanspeed", instance: "gpu0", scale: undefined });
+        assert.deepEqual(historyMetric("nvidia-pci-0200", gpu, "Power", "power"),
+                         { id: "nvidia.power.gpu0", name: "nvidia.power", instance: "gpu0", scale: 0.001 });
+        assert.equal(historyMetric("nvidia-pci-0200", { GPU: { temp1_input: 69 } }, "GPU", "temp"), null,
+                     "no instance without the card's index");
+    });
+
+    QUnit.test("metricsDecoder", assert => {
+        // real messages of the metrics1 channel reading nvidia.temperature from a pmlogger archive:
+        // before the archive starts there are no instances, then gpu0
+        const messages = [
+            { timestamp: 1000, interval: 60000, metrics: [{ name: "nvidia.temperature", instances: [] }] },
+            [[[]]],
+            { timestamp: 61000, interval: 60000, metrics: [{ name: "nvidia.temperature", instances: ["gpu0"] }] },
+            [[[67.0]], [[68.0]], [[]], [null], [[false]]],
+        ];
+        const temperature = metricsDecoder({ id: "t", name: "nvidia.temperature", instance: "gpu0" }, 60000);
+        messages.forEach(temperature.decode);
+        assert.deepEqual(temperature.samples.map(s => s.v), [null, 67, 68, 68, 68, null], "shorter arrays and null mean unchanged");
+        assert.deepEqual(temperature.samples.map(s => s.t), [1000, 61000, 121000, 181000, 241000, 301000]);
+
+        const power = metricsDecoder({ id: "p", name: "nvidia.power", instance: "gpu1", scale: 0.001 }, 60000);
+        power.decode({ timestamp: 0, interval: 60000, metrics: [{ name: "nvidia.power", instances: ["gpu0", "gpu1"] }] });
+        power.decode([[[50000, 83510]], [[null, 62480]]]);
+        assert.deepEqual(power.samples.map(s => s.v === null ? null : Math.round(s.v * 1000) / 1000), [83.51, 62.48],
+                         "the requested instance, in watts");
+
+        const other = metricsDecoder({ id: "o", name: "nvidia.power", instance: "gpu3" }, 60000);
+        other.decode({ timestamp: 0, interval: 60000, metrics: [{ name: "nvidia.power", instances: ["gpu0"] }] });
+        other.decode([[[50000]]]);
+        assert.deepEqual(other.samples.map(s => s.v), [null], "no value for an instance the archive lacks");
+
+        const plain = metricsDecoder({ id: "l", name: "lmsensors.coretemp_isa_0000.core_0" }, 60000);
+        plain.decode({ timestamp: 0, interval: 60000, metrics: [{ name: "lmsensors.coretemp_isa_0000.core_0" }] });
+        plain.decode([[45], [null], [], [false], [47]]);
+        assert.deepEqual(plain.samples.map(s => s.v), [45, 45, 45, null, 47]);
+    });
+
+    QUnit.test("rowHistoryStatus", assert => {
+        assert.equal(rowHistoryStatus("coretemp-isa-0000", "no-gpu-logger"), "enabled", "lm-sensors history works");
+        assert.equal(rowHistoryStatus("nvidia-pci-0200", "no-gpu-logger"), "no-gpu-logger");
+        assert.equal(rowHistoryStatus("nvidia-pci-0200", "enabled"), "enabled");
+        assert.equal(rowHistoryStatus("coretemp-isa-0000", "no-pmda"), "no-pmda");
     });
 
     QUnit.test("pcpPackages", assert => {
@@ -241,6 +292,9 @@ QUnit.module("history", () => {
         assert.deepEqual(pcpPackages(["fedora"], false), ["pcp", "python3-pcp", "pcp-pmda-lmsensors"]);
         assert.deepEqual(pcpPackages(["ubuntu", "debian"], false), ["pcp", "python3-pcp"]);
         assert.equal(pcpPackages(["arch"], true), null);
+        // the NVIDIA PMDA: its own package outside Debian and Ubuntu
+        assert.deepEqual(pcpPackages(["fedora"], false, true), ["pcp", "python3-pcp", "pcp-pmda-lmsensors", "pcp-pmda-nvidia-gpu"]);
+        assert.deepEqual(pcpPackages(["debian"], false, true), ["pcp", "python3-pcp"]);
     });
 
     QUnit.test("historyCsv", assert => {

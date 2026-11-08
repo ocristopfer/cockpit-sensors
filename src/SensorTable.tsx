@@ -11,7 +11,7 @@ import cockpit from "cockpit";
 import React from "react";
 
 import { HistoryPanel } from "./HistoryChart";
-import { hasHistory, pcpMetricName } from "./history";
+import { historyMetric, rowHistoryStatus } from "./history";
 import {
     extractSensorGroup, formatDisplayValue, formatSensorKey, formatSensorValue, getSubFeature, isFlagKey,
     formatReasons, subFeatureLabel, toDisplayValue
@@ -114,9 +114,8 @@ export const SensorTable = ({ chipName, chipData, category }: {
                         const key = sensorKey(chipName, label);
                         const alias = view.aliases[key];
                         const hidden = view.hidden.has(key);
-                        const metric = pcpMetricName(chipName, label);
-                        const withHistory = hasHistory(chipName, values);
-                        const isExpanded = withHistory && view.expanded.has(metric);
+                        const metric = historyMetric(chipName, chipData, label, category.key);
+                        const isExpanded = metric !== null && view.expanded.has(metric.id);
                         const max = getSubFeature(values, "max");
                         const crit = getSubFeature(values, "crit");
                         const status = view.statuses.get(chipName, label, category.key, values);
@@ -126,8 +125,8 @@ export const SensorTable = ({ chipName, chipData, category }: {
                         return (
                             <Tbody key={label} isExpanded={isExpanded}>
                                 <Tr className={hidden ? "sensors-row-hidden" : ""} data-sensor={label}>
-                                    {withHistory
-                                        ? <Td expand={{ rowIndex, isExpanded, onToggle: () => view.onToggleExpanded(metric), expandId: `history-${metric}` }} />
+                                    {metric
+                                        ? <Td expand={{ rowIndex, isExpanded, onToggle: () => view.onToggleExpanded(metric.id), expandId: `history-${metric.id}` }} />
                                         : <Td />}
                                     <Td dataLabel={_("Label")}>
                                         <SensorName name={label} alias={alias} hidden={hidden} />
@@ -173,7 +172,7 @@ export const SensorTable = ({ chipName, chipData, category }: {
                                         />
                                     </Td>
                                 </Tr>
-                                {isExpanded &&
+                                {isExpanded && metric &&
                                     <Tr isExpanded>
                                         <Td colSpan={columns.length + 5}>
                                             <ExpandableRowContent>
@@ -184,7 +183,7 @@ export const SensorTable = ({ chipName, chipData, category }: {
                                                     fahrenheit={view.fahrenheit}
                                                     max={max}
                                                     crit={crit}
-                                                    status={view.historyStatus}
+                                                    status={rowHistoryStatus(chipName, view.historyStatus)}
                                                     onEnable={onEnableHistory}
                                                 />
                                             </ExpandableRowContent>
