@@ -142,3 +142,21 @@ Description: Cockpit module that displays all data reported by lm-sensors
  Provides real-time monitoring of hardware sensors including CPU temperature,
  fan speeds and voltages in the Cockpit web console.
 
+Package: cockpit-sensors
+Architecture: all
+Version: 2.3.0
+Priority: optional
+Section: admin
+Maintainer: ocristopfer <ocristopfer@gmail.com>
+Depends: cockpit-bridge, lm-sensors
+Filename: pool/main/c/cockpit-sensors/cockpit-sensors_2.3.0_all.deb
+Size: 303272
+MD5sum: d5a743714100e3ed95ac8e1d70f8b786
+SHA1: 57e91ea74a6ba1cc534f2c1d67d7ac65495edd2b
+SHA256: 323b69796c131413c2e4eb618706d0a01254f2fd012fdda1d6425cdf278203a9
+SHA512: e8ab61aedfe9a7aed2b74d9f5fdaa9aecd0c2a4f12fc8e1586dec004ae3e9a5ce71802494b5ae013ffcea518b66ed3eef82c25cd803e02ddd1893fa0e3fa6e8c
+Homepage: https://github.com/ocristopfer/cockpit-sensors
+Description: Cockpit module that displays all data reported by lm-sensors
+ Provides real-time monitoring of hardware sensors including CPU temperature,
+ fan speeds and voltages in the Cockpit web console.
+
