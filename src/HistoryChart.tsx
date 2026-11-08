@@ -14,7 +14,7 @@ import cockpit from "cockpit";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as timeformat from "timeformat";
 
-import { historyRanges, loadHistory, LOG_INTERVAL_MS } from "./history";
+import { historyRanges, lineSegments, loadHistory, LOG_INTERVAL_MS } from "./history";
 import type { HistoryRange, HistorySample, HistoryStatus } from "./history";
 import { formatDisplayValue, toDisplayValue, unitLabel } from "./sensors";
 import { historyCsv } from "./csv";
@@ -90,20 +90,9 @@ const LineChart = ({ samples, start, end, thresholds, format, timeFormat }: {
     const x = (t: number) => MARGIN.left + ((t - start) / (end - start)) * plotWidth;
     const y = (v: number) => MARGIN.top + (1 - (v - yMin) / (yMax - yMin)) * plotHeight;
 
-    // split the line at gaps (no value recorded)
-    const segments: string[] = [];
-    let segment = "";
-    for (const sample of samples) {
-        if (sample.v === null) {
-            if (segment)
-                segments.push(segment);
-            segment = "";
-            continue;
-        }
-        segment += `${segment ? "L" : "M"}${x(sample.t).toFixed(1)},${y(sample.v).toFixed(1)}`;
-    }
-    if (segment)
-        segments.push(segment);
+    // one line per run of values, split where nothing was recorded
+    const segments = lineSegments(samples).map(segment =>
+        segment.map((sample, i) => `${i ? "L" : "M"}${x(sample.t).toFixed(1)},${y(sample.v as number).toFixed(1)}`).join(""));
 
     const xTicks = [0, 0.25, 0.5, 0.75, 1].map(f => start + f * (end - start));
 

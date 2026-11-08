@@ -38,6 +38,41 @@ export const historyRanges: HistoryRange[] = [
 // how often pmlogger records the sensors (see PMLOGCONF_GROUP)
 export const LOG_INTERVAL_MS = MINUTE;
 
+// longest run of missing samples that the chart draws across
+const MAX_BRIDGED_GAP_MS = 15 * MINUTE;
+
+/*
+ * Split samples into the runs of values that the chart draws as one line.
+ * PCP cannot interpolate across the end of one pmlogger archive and the start
+ * of the next, such as when pmlogger_daily restarts pmlogger every night, so
+ * a sample or two there has no value. Draw across such short gaps (a single
+ * missing sample, or up to MAX_BRIDGED_GAP_MS) and split the line at longer
+ * ones, when nothing was recorded.
+ */
+export const lineSegments = (samples: HistorySample[]): HistorySample[][] => {
+    const segments: HistorySample[][] = [];
+    let segment: HistorySample[] = [];
+    let missing = 0;
+
+    for (const sample of samples) {
+        if (sample.v === null) {
+            missing++;
+            continue;
+        }
+        const last = segment[segment.length - 1];
+        if (last && missing > 1 && sample.t - last.t > MAX_BRIDGED_GAP_MS) {
+            segments.push(segment);
+            segment = [];
+        }
+        segment.push(sample);
+        missing = 0;
+    }
+    if (segment.length > 0)
+        segments.push(segment);
+
+    return segments;
+};
+
 /*
  * Name of the PCP metric for a sensor, mirroring how pmdalmsensors builds it:
  * it strips a digit before "_" in the raw JSON, replaces "." in labels by ",",
