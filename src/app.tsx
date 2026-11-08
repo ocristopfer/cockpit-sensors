@@ -32,6 +32,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { enableHistory, getHistoryStatus, needsCockpitPcp, pcpPackages } from "./history";
 import type { HistoryStatus } from "./history";
+import { readNvidiaGpus } from "./nvidia";
 import { page_status } from "notifications";
 
 import { Overview } from "./Overview";
@@ -205,6 +206,20 @@ const Application = () => {
     const lastError = useRef<string | null>(null);
     // when the sensors were last read
     const lastRead = useRef<number>(0);
+    // whether nvidia-smi is installed; stop calling it once it is known not to be
+    const nvidiaSmi = useRef<boolean>(true);
+
+    // add the NVIDIA GPUs, which lm-sensors does not see on the proprietary driver
+    const withNvidiaGpus = async (data: SensorData): Promise<SensorData> => {
+        if (!nvidiaSmi.current)
+            return data;
+        const gpus = await readNvidiaGpus();
+        if (gpus === null) {
+            nvidiaSmi.current = false;
+            return data;
+        }
+        return { ...data, ...gpus };
+    };
 
     const showPollingError = (msg: string) => {
         if (lastError.current === msg)
@@ -234,16 +249,17 @@ const Application = () => {
         cockpit
                 .spawn(["sensors", json ? "-j" : "-u"], { err: "message", superuser: "try" })
                 .then((output: string) => {
-                    if (!json) {
-                        receiveData(parseSensorsRaw(output));
-                        return;
-                    }
+                    if (!json)
+                        return withNvidiaGpus(parseSensorsRaw(output)).then(receiveData);
+                    let data: SensorData;
                     try {
-                        receiveData(JSON.parse(output));
+                        data = JSON.parse(output);
                     } catch {
                         // some lm-sensors versions emit invalid JSON for unreadable sub-features
                         jsonSupported.current = false;
+                        return;
                     }
+                    return withNvidiaGpus(data).then(receiveData);
                 })
                 .catch((err: { message: string, problem?: string }) => {
                     if (err.problem === "not-found" || err.message === "not-found") {
@@ -254,10 +270,8 @@ const Application = () => {
                         });
                         return;
                     }
-                    if (isNoSensorsError(err.message)) {
-                        receiveData({});
-                        return;
-                    }
+                    if (isNoSensorsError(err.message))
+                        return withNvidiaGpus({}).then(receiveData);
                     if (json && err.message.includes("invalid option")) {
                         jsonSupported.current = false;
                         return;

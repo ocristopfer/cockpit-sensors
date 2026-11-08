@@ -9,6 +9,8 @@
 
 import cockpit from "cockpit";
 
+import { isNvidiaChip } from "./nvidia";
+
 export type HistoryStatus =
     | "loading"
     | "no-pcp" // PCP is not installed
@@ -85,9 +87,10 @@ export const pcpMetricName = (chip: string, label: string): string => {
     return `lmsensors.${clean(chip)}.${clean(label.replace(/\./g, ","))}`;
 };
 
-// sensors that pmdalmsensors exports: the ones with an *_input sub-feature
-export const hasHistory = (values: Record<string, number>): boolean =>
-    Object.keys(values).some(key => key.includes("_input"));
+// sensors that pmdalmsensors exports: the lm-sensors ones with an *_input sub-feature
+// (not the NVIDIA GPUs read with nvidia-smi)
+export const hasHistory = (chipName: string, values: Record<string, number>): boolean =>
+    !isNvidiaChip(chipName) && Object.keys(values).some(key => key.includes("_input"));
 
 /*
  * Cockpit reads PCP archives with its Python bridge since version 326, which

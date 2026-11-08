@@ -2,6 +2,7 @@
 
 import { historyCsv } from "../../src/csv";
 import { hasHistory, lineSegments, pcpMetricName, pcpPackages } from "../../src/history";
+import { parseNvidiaSmi } from "../../src/nvidia";
 import {
     chipDisplayName, chipDisplayNames, extractSensorGroup, formatReasons, formatSensorValue, getOsIds, getReading,
     parseSensorsRaw, sensorStatus, worstLevel
@@ -152,6 +153,33 @@ QUnit.module("sensors", () => {
         assert.equal(worstLevel([]), "ok");
     });
 
+    QUnit.test("parseNvidiaSmi", assert => {
+        // real output of a GTX 1060 on the proprietary driver
+        const gtx1060 = "0, 00000000:02:00.0, NVIDIA GeForce GTX 1060 3GB, 69, 38, 83.51, 120.00\n";
+        const data = parseNvidiaSmi(gtx1060);
+        assert.deepEqual(Object.keys(data), ["nvidia-pci-0200"]);
+        const chip = data["nvidia-pci-0200"];
+        assert.equal(chip.Adapter, "NVIDIA GeForce GTX 1060 3GB");
+        assert.deepEqual(extractSensorGroup(chip, "temp"), { GPU: { temp1_input: 69 } });
+        assert.deepEqual(extractSensorGroup(chip, "pwm"), { Fan: { pwm1_input: 38 } });
+        assert.deepEqual(extractSensorGroup(chip, "power"), { Power: { power1_input: 83.51, power1_cap: 120 } });
+        assert.equal(chipDisplayName("nvidia-pci-0200"), "GPU");
+        assert.equal(formatSensorValue("pwm", "input", 38, false), "38 %");
+
+        // fanless cards and missing readings report [N/A] or [Not Supported]
+        const two = parseNvidiaSmi([
+            "0, 00000000:01:00.0, NVIDIA A100, 41, [N/A], 55.10, [Not Supported]",
+            "1, 0000:81:1f.3, NVIDIA A100, [N/A], [N/A], [N/A], [N/A]",
+            "",
+        ].join("\n"));
+        assert.deepEqual(Object.keys(two), ["nvidia-pci-0100", "nvidia-pci-81fb"], "device 1f, function 3 is devfn fb");
+        assert.deepEqual(Object.keys(two["nvidia-pci-0100"]), ["Adapter", "GPU", "Power"]);
+        assert.deepEqual(two["nvidia-pci-0100"].Power, { power1_input: 55.1 }, "no cap when the limit is unknown");
+        assert.deepEqual(Object.keys(two["nvidia-pci-81fb"]), ["Adapter"]);
+        assert.deepEqual(Object.keys(parseNvidiaSmi("0, unknown, X, 50, 0, 0, 0")), ["nvidia-gpu-0"]);
+        assert.deepEqual(parseNvidiaSmi(""), {});
+    });
+
     QUnit.test("chipDisplayName", assert => {
         assert.equal(chipDisplayName("coretemp-isa-0000"), "CPU (Intel)");
         assert.equal(chipDisplayName("k10temp-pci-00c3"), "CPU (AMD)");
@@ -201,8 +229,9 @@ QUnit.module("history", () => {
     });
 
     QUnit.test("hasHistory", assert => {
-        assert.true(hasHistory({ temp1_input: 1 }));
-        assert.false(hasHistory({ intrusion0_alarm: 0 }));
+        assert.true(hasHistory("coretemp-isa-0000", { temp1_input: 1 }));
+        assert.false(hasHistory("nct6798-isa-0290", { intrusion0_alarm: 0 }));
+        assert.false(hasHistory("nvidia-pci-0200", { temp1_input: 69 }), "pmdalmsensors does not see NVIDIA GPUs");
     });
 
     QUnit.test("pcpPackages", assert => {
